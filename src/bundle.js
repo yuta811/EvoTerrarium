@@ -2,7 +2,7 @@
 (function(global){
   const THREE=global.THREE;
   function Controls(cam,dom){this.object=cam;this.domElement=dom;this.target=new THREE.Vector3(0,0,0);
-    this.maxPolarAngle=Math.PI*0.49;this.minDistance=8;this.maxDistance=150;
+    this.maxPolarAngle=Math.PI*0.49;this.minDistance=2;this.maxDistance=150;
     let st=null,sx=0,sy=0,phi=0.9,theta=0.8,rad=45;
     const upd=()=>{const sp=Math.max(0.05,Math.min(this.maxPolarAngle,phi));rad=Math.max(this.minDistance,Math.min(this.maxDistance,rad));
       const x=this.target.x+rad*Math.sin(sp)*Math.sin(theta),y=this.target.y+rad*Math.cos(sp),z=this.target.z+rad*Math.sin(sp)*Math.cos(theta);
@@ -67,7 +67,7 @@
     return new this._THREE.Color().setHSL(hue,0.85,(e.mode==='swim'?0.65:0.55));
   };
   CMesh.prototype.update=function(list){
-    const CREATURE_SCALE = 0.1;
+    const CREATURE_SCALE = 0.25;
     const seen=new Set();
     const n=Math.min(list.length,this.cap);
     this._time=(this._time||0)+0.1;const t=this._time;
