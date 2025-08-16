@@ -42,9 +42,70 @@
     this.propsGroup.clear();const trunkG=new THREE.CylinderGeometry(0.08,0.08,0.9,6),leafG=new THREE.ConeGeometry(0.6,1.2,6),treeM=new THREE.MeshLambertMaterial({color:0x2e7d32}),trunkM=new THREE.MeshLambertMaterial({color:0x8d6e63}),cactusG=new THREE.CylinderGeometry(0.15,0.18,1.2,5),cactusM=new THREE.MeshLambertMaterial({color:0x3f8f6a}),rockG=new THREE.DodecahedronGeometry(0.25,0),rockM=new THREE.MeshLambertMaterial({color:0x8a8a8a}),reedG=new THREE.ConeGeometry(0.06,0.8,5),reedM=new THREE.MeshLambertMaterial({color:0x9ccc65});
     const trunks=new THREE.InstancedMesh(trunkG,trunkM,2000);trunks.count=0;const leaves=new THREE.InstancedMesh(leafG,treeM,2000);leaves.count=0;const cactus=new THREE.InstancedMesh(cactusG,cactusM,1500);cactus.count=0;const rocks=new THREE.InstancedMesh(rockG,rockM,2500);rocks.count=0;const reeds=new THREE.InstancedMesh(reedG,reedM,1500);reeds.count=0;this.propsGroup.add(trunks);this.propsGroup.add(leaves);this.propsGroup.add(cactus);this.propsGroup.add(rocks);this.propsGroup.add(reeds);
     const dummy=new THREE.Object3D();for(const p of terr.props||[]){const y=Math.round(p.y/step)*step*vs;dummy.position.set(p.x,y+(p.type==='tree'?0.45:(p.type==='reed'?0.4:(p.type==='cactus'?0.6:0.2))),p.z);const s=p.s*(p.type==='rock'?0.9:1.0);dummy.scale.set(s,s,s);dummy.updateMatrix();if(p.type==='tree'){const i=trunks.count++;trunks.setMatrixAt(i,dummy.matrix);dummy.position.y=y+1.2;dummy.updateMatrix();const j=leaves.count++;leaves.setMatrixAt(j,dummy.matrix);}else if(p.type==='cactus'){const i=cactus.count++;cactus.setMatrixAt(i,dummy.matrix);}else if(p.type==='rock'){const i=rocks.count++;rocks.setMatrixAt(i,dummy.matrix);}else if(p.type==='reed'){const i=reeds.count++;reeds.setMatrixAt(i,dummy.matrix);}}[trunks,leaves,cactus,rocks,reeds].forEach(m=>{m.instanceMatrix&& (m.instanceMatrix.needsUpdate=true);});};
-  function CMesh(cap){const geo=new THREE.SphereGeometry(0.25,12,12);const mat=new THREE.MeshLambertMaterial({vertexColors:true});this.mesh=new THREE.InstancedMesh(geo,mat,cap);this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.mesh.count=0;this.cap=cap;this._d=new THREE.Object3D();this._THREE=THREE;}
-  CMesh.prototype.update=function(list){const n=Math.min(list.length,this.cap);this.mesh.count=n;for(let i=0;i<n;i++){const e=list[i];this._d.position.set(e.x,e.y,e.z);const tiltX=(e.vz||0)*0.06,tiltZ=-(e.vx||0)*0.06;this._d.rotation.set(tiltX,e.yaw||0,tiltZ);const s=0.35+e.size*0.9+(e.mode==='swim'?-0.1:0);this._d.scale.set(s,s,s);this._d.updateMatrix();this.mesh.setMatrixAt(i,this._d.matrix);const base=e.diet===1?0.0:0.33;const c=new this._THREE.Color().setHSL(base+(e.hue||0.35)*0.15,0.85,(e.mode==='swim'?0.65:0.55));this.mesh.setColorAt(i,c);}this.mesh.instanceMatrix.needsUpdate=true;this.mesh.instanceColor&& (this.mesh.instanceColor.needsUpdate=true);};
-  CMesh.prototype.dispose=function(){this.mesh.geometry.dispose();this.mesh.material.dispose();};
+  function CMesh(cap){
+    this.cap=cap;
+    this.group=new THREE.Group();
+    this.mesh=this.group;
+    this._THREE=THREE;
+    this.objects=new Map();
+  }
+  CMesh.prototype._create=function(){
+    const mat=new this._THREE.MeshLambertMaterial({color:0xffffff});
+    const body=new this._THREE.Mesh(new this._THREE.BoxGeometry(1,1,1),mat);
+    const head=new this._THREE.Mesh(new this._THREE.BoxGeometry(1,1,1),mat);
+    const legGeo=new this._THREE.BoxGeometry(1,1,1);
+    const legs=[];for(let i=0;i<4;i++){legs.push(new this._THREE.Mesh(legGeo,mat));}
+    const tail=new this._THREE.Mesh(new this._THREE.BoxGeometry(1,1,1),mat);
+    const g=new this._THREE.Group();
+    g.add(body);g.add(head);legs.forEach(l=>g.add(l));g.add(tail);
+    return {group:g,material:mat,body,head,legs,tail};
+  };
+  CMesh.prototype._colorFrom=function(e){
+    const warm=e.genes.diet===1;
+    const base=warm?0.0:0.55;
+    const hue=(base+((e.species*0.61803398875)%0.15))%1;
+    return new this._THREE.Color().setHSL(hue,0.85,(e.mode==='swim'?0.65:0.55));
+  };
+  CMesh.prototype.update=function(list){
+    const seen=new Set();
+    const n=Math.min(list.length,this.cap);
+    for(let idx=0;idx<n;idx++){
+      const e=list[idx];
+      let obj=this.objects.get(e.id);
+      if(!obj){obj=this._create();this.objects.set(e.id,obj);this.group.add(obj.group);} 
+      seen.add(e.id);
+      const s=0.35+(e.genes.size||0)*0.9+(e.mode==='swim'?-0.1:0);
+      const tiltX=(e.vz||0)*0.06,tiltZ=-(e.vx||0)*0.06;
+      obj.group.position.set(e.x,e.y,e.z);
+      obj.group.rotation.set(tiltX,e.yaw||0,tiltZ);
+      const bodyLen=s*2.0;
+      obj.body.scale.set(s*1.2,s*0.7,bodyLen);
+      obj.head.position.set(0,0,bodyLen*0.5);
+      obj.head.scale.set(s*0.6,s*0.6,s*0.6);
+      const legLen=s*(0.7+(e.genes.speed||0));
+      const legThick=s*(0.2+(e.genes.climb||0)*0.3);
+      const legPos=[[ -s*0.4,-legLen/2, bodyLen*0.25],[ s*0.4,-legLen/2, bodyLen*0.25],[ -s*0.4,-legLen/2,-bodyLen*0.25],[ s*0.4,-legLen/2,-bodyLen*0.25]];
+      for(let i=0;i<4;i++){const leg=obj.legs[i];leg.scale.set(legThick,legLen,legThick);leg.position.set(legPos[i][0],legPos[i][1],legPos[i][2]);}
+      const tailLen=s*(0.5+(e.genes.swim||0));
+      obj.tail.scale.set(legThick*0.6,legThick*0.6,tailLen);
+      obj.tail.position.set(0,0,-bodyLen*0.5-tailLen*0.5);
+      const col=this._colorFrom(e);obj.material.color.copy(col);
+    }
+    for(const [id,obj] of this.objects){
+      if(!seen.has(id)){
+        this.group.remove(obj.group);
+        obj.group.traverse(n=>{n.geometry&&n.geometry.dispose&&n.geometry.dispose();});
+        obj.material.dispose();
+        this.objects.delete(id);
+      }
+    }
+  };
+  CMesh.prototype.dispose=function(){
+    for(const [id,obj] of this.objects){
+      obj.group.traverse(n=>{n.geometry&&n.geometry.dispose&&n.geometry.dispose();if(n.material&&n.material.dispose) n.material.dispose();});
+    }
+    this.objects.clear();
+  };
   const d=(m)=>{const el=document.getElementById('diag');if(el)el.textContent='diag: '+m;console.log('[diag]',m);};
   const container=document.getElementById('app');d('engine constructing');const engine=new Engine3D(container);engine.onResize();
   let cap=parseInt(document.getElementById('cap').value,10);let creatures=new CMesh(cap);engine.scene.add(creatures.mesh);let sim=null;try{sim=new Worker('./src/sim/worker.js');d('worker started');}catch(e){d('worker failed: '+e);}
