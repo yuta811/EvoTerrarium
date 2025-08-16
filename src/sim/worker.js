@@ -2,7 +2,7 @@
 // Worker v9 (terrain-following + natural selection + speciation)
 let entities=[],plants=[],devices=[];
 let world={t:0,bounds:28,season:0,seasonSpeed:1,simCap:4000};
-const CREATURE_SCALE = 0.1;
+const CREATURE_SCALE = 0.25;
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 // Map
