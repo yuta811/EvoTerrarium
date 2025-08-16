@@ -1,7 +1,8 @@
 
 // Worker v9 (terrain-following + natural selection + speciation)
-let entities=[],devices=[];
-let world={t:0,bounds:28,season:0,seasonSpeed:1,simCap:4000};
+let entities=[],devices[];
+let world={t:0,bounds:28,season:0,seasonSpeed:1,simCap:4000,resourceScale:1.0};
+let resourceScale=1.0;
 const CREATURE_SCALE = 0.25;
 // Foraging and resource search tuning constants (provisional)
 const FORAGE_NEAR_RES_COEF = 0.5;      // influence of nearby resource scarcity
@@ -148,4 +149,14 @@ function snapshot(){
   }
   postMessage({type:'state',payload:{entities:list,world,devices}});
 }
-let timer=null; onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload; if(t==='init'){init((p&&p.seed)||1,(p&&p.entityCount)||200,p&&p.simCap||4000); if(timer)clearInterval(timer); const dt=0.1; timer=setInterval(()=>{tick(dt);snapshot();},100);} else if(t==='seasonSpeed'){world.seasonSpeed=p||1.0;} else if(t==='placeDevice'){devices.push({type:p.type,x:p.x,z:p.z,power:1.0,radius:5.0});} else if(t==='pickSelect'){let best=null,bd2=1e9;for(const ent of entities){const dx=ent.x-p.x,dz=ent.z-p.z,d2=dx*dx+dz*dz;if(d2<bd2){bd2=d2;best=ent;}} if(best)postMessage({type:'selected',payload:{x:best.x,z:best.z}});} else if(t==='regenMap'){generateMap(p||{seed:Date.now(),size:96,step:0.3,slope:1.1,mount:1.0,rivers:true});} else if(t==='getTree'){postMessage({type:'tree',payload:{nodes:treeNodes}});} else if(t==='selectSpecies'){postMessage({type:'rpgReady',payload:{species:p.species}});} else if(t==='simCap'){world.simCap=p||world.simCap;} }catch(err){postMessage({type:'error',payload:''+err});}};
+let timer=null; onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload;
+  if(t==='init'){init((p&&p.seed)||1,(p&&p.entityCount)||200,p&&p.simCap||4000); if(timer)clearInterval(timer); const dt=0.1; timer=setInterval(()=>{tick(dt);snapshot();},100);}
+  else if(t==='seasonSpeed'){world.seasonSpeed=p||1.0;}
+  else if(t==='placeDevice'){devices.push({type:p.type,x:p.x,z:p.z,power:1.0,radius:5.0});}
+  else if(t==='pickSelect'){let best=null,bd2=1e9;for(const ent of entities){const dx=ent.x-p.x,dz=ent.z-p.z,d2=dx*dx+dz*dz;if(d2<bd2){bd2=d2;best=ent;}} if(best)postMessage({type:'selected',payload:{x:best.x,z:best.z}});}
+  else if(t==='regenMap'){generateMap(p||{seed:Date.now(),size:96,step:0.3,slope:1.1,mount:1.0,rivers:true});}
+  else if(t==='getTree'){postMessage({type:'tree',payload:{nodes:treeNodes}});}
+  else if(t==='selectSpecies'){postMessage({type:'rpgReady',payload:{species:p.species}});}
+  else if(t==='resourceScale'){const newValue=p||1.0;const factor=newValue/resourceScale;for(let i=0;i<map.resources.length;i++){map.resources[i]*=factor;map.resMax[i]*=factor;map.resRegen[i]*=factor;}resourceScale=newValue;world.resourceScale=newValue;snapshot();}
+  else if(t==='simCap'){world.simCap=p||world.simCap;}
+ }catch(err){postMessage({type:'error',payload:''+err});}};
