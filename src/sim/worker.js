@@ -117,7 +117,7 @@ function tick(dt){
     e.x+=e.vx*dt; e.z+=e.vz*dt; const B=world.bounds-1.0; if(e.x<-B){e.x=-B;e.vx*=-0.8;} if(e.x>B){e.x=B;e.vx*=-0.8;} if(e.z<-B){e.z=-B;e.vz*=-0.8;} if(e.z>B){e.z=B;e.vz*=-0.8;}
     const gY=heightAtWorld(e.x,e.z); e.y=gY+(inWater?(map.waterLevel*VERT-gY):0)+(inWater?0.15:0.35)*CREATURE_SCALE; if(avoidSlope>0.6){e.vx-=Math.sign(e.vx)*0.02; e.vz-=Math.sign(e.vz)*0.02;}
     const biome=b; const biomeMul=(biome===2?0.6:(biome===3?1.3:(biome===4?0.7:1.0)));
-    let intake=(e.genes.diet===0)?(0.1+0.7*plantRichnessAt(e.x,e.z)*biomeMul+0.2*comfort):(0.12+0.4*comfort);
+    let intake=(e.genes.diet===0)?(0.7*plantRichnessAt(e.x,e.z)*biomeMul):0;
     const moveCost=(0.002+0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0));
     const basal=0.0008+0.0006*e.genes.size+(e.genes.diet===1?0.0006:0);
     if(e.genes.diet===0){
@@ -126,11 +126,9 @@ function tick(dt){
       const maxConsume=intake*dt;
       const consumed=Math.min(available,maxConsume);
       map.resources[i]=available-consumed;
-      if(consumed<maxConsume)intake=consumed/dt;
-      const nutritionEff=1.0;
-      e.energy+=(consumed*nutritionEff)-(moveCost+basal);
+      e.energy+=consumed-(moveCost+basal);
     }else{
-      e.energy+=(intake*dt)-(moveCost+basal);
+      e.energy-=(moveCost+basal);
     }
     if(inWater)e.hydration=Math.max(e.hydration,Math.min(1.0,e.hydration+0.5*dt)); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
     if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>1.5&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
