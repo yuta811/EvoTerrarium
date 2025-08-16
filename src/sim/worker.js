@@ -1,6 +1,6 @@
 
 // Worker v9 (terrain-following + natural selection + speciation)
-let entities=[],plants=[],devices=[];
+let entities=[],devices=[];
 let world={t:0,bounds:28,season:0,seasonSpeed:1,simCap:4000};
 const CREATURE_SCALE = 0.25;
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
@@ -34,15 +34,43 @@ function regSpecies(id,parent){const hue=(speciesHues[id]!==undefined?speciesHue
 function gdist(a,b){return Math.abs(a.size-b.size)*0.8+Math.abs(a.speed-b.speed)*0.6+Math.abs(a.thermo-b.thermo)*0.8+Math.abs(a.climb-b.climb)*0.6+Math.abs(a.swim-b.swim)*0.6+Math.abs(a.social-b.social)*0.4+(a.diet!==b.diet?0.4:0);}
 function newGenes(base){return {size:clamp01((base&&base.size||0.5)+(rand()*2-1)*0.05),speed:clamp01((base&&base.speed||0.5)+(rand()*2-1)*0.05),thermo:clamp01((base&&base.thermo||rand())+(rand()*2-1)*0.03),climb:clamp01((base&&base.climb||rand())+(rand()*2-1)*0.03),swim:clamp01((base&&base.swim||rand())+(rand()*2-1)*0.03),social:clamp01((base&&base.social||rand())+(rand()*2-1)*0.03),diet:(base&&base.diet!==undefined)?base.diet:(rand()<0.15?1:0)};}
 function spawnEntity(id){const g=newGenes();const x=(rand()*2-1)*(world.bounds*0.6),z=(rand()*2-1)*(world.bounds*0.6);const sp=nextSpeciesId++;speciesHues[sp]=rand();regSpecies(sp,0);return {id,x,z,y:heightAtWorld(x,z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy:1.0,age:0.0,hydration:1.0,cooldown:rand()*6,genes:g,species:sp,mode:'walk',biomeExp:new Uint8Array(5)};}
-function spawnPlant(){return {x:(rand()*2-1)*world.bounds*0.85,z:(rand()*2-1)*world.bounds*0.85,richness:0.6+rand()*0.4};}
 function reproduce(p){const cg=newGenes(p.genes);const fav=p.biomeExp?p.biomeExp.indexOf(Math.max(...p.biomeExp)):0;const drift=gdist(cg,p.genes)+((fav===2||fav===3)?0.05:0);let sp=p.species;if(drift>0.22){sp=++nextSpeciesId;speciesHues[sp]=rand();regSpecies(sp,p.species);}entities.push({id:nextId++,x:p.x+(rand()*2-1)*0.5,z:p.z+(rand()*2-1)*0.5,y:heightAtWorld(p.x,p.z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy:0.6,hydration:0.8,age:0.0,cooldown:4+rand()*4,genes:cg,species:sp,mode:'walk',biomeExp:new Uint8Array(5)});}
 // env
 function comfortTempBase(z){return (Math.sin(z*0.07)*0.5+0.5);} function comfortTempWithDevices(x,z){let t=comfortTempBase(z);for(const d of devices){if(d.type!=='heater')continue;const dx=d.x-x,dz=d.z-z;const r2=dx*dx+dz*dz;const fall=Math.exp(-r2/(d.radius*d.radius));t=clamp01(t+d.power*0.25*fall);}return t;}
-function plantRichnessAt(x,z){let best=0.0;for(const p of plants){const dx=p.x-x,dz=p.z-z;const d2=dx*dx+dz*dz;const e=p.richness/(1+d2*0.05);if(e>best)best=e;}for(const d of devices){if(d.type!=='sprinkler')continue;const dx=d.x-x,dz=d.z-z;const r2=dx*dx+dz*dz;const fall=Math.exp(-r2/(d.radius*d.radius));best+=d.power*0.8*fall;}return best;} function waterNear(x,z){return heightRawAt(x,z)<map.waterLevel?1.0:0.0;}
+function plantRichnessAt(x,z){
+  const N=map.size;
+  const fx=((x/(world.bounds*2))+0.5)*(N-1);
+  const fz=((z/(world.bounds*2))+0.5)*(N-1);
+  const xi=Math.floor(fx), zi=Math.floor(fz);
+  let best=0.0;
+  const R=2;
+  for(let dz=-R;dz<=R;dz++){
+    for(let dx=-R;dx<=R;dx++){
+      const tx=xi+dx, tz=zi+dz;
+      if(tx<0||tx>=N||tz<0||tz>=N)continue;
+      const idx=tz*N+tx;
+      const wx=(tx/(N-1)-0.5)*(world.bounds*2);
+      const wz=(tz/(N-1)-0.5)*(world.bounds*2);
+      const ddx=wx-x, ddz=wz-z;
+      const d2=ddx*ddx+ddz*ddz;
+      const e=map.resources[idx]/(1+d2*0.05);
+      if(e>best)best=e;
+    }
+  }
+  for(const d of devices){
+    if(d.type!=='sprinkler')continue;
+    const dx=d.x-x,dz=d.z-z;
+    const r2=dx*dx+dz*dz;
+    const fall=Math.exp(-r2/(d.radius*d.radius));
+    best+=d.power*0.8*fall;
+  }
+  return best;
+}
+function waterNear(x,z){return heightRawAt(x,z)<map.waterLevel?1.0:0.0;}
 // spatial hash
 const cell=3.0;let grid=new Map();function gkey(ix,iz){return (ix<<16)|(iz&0xffff);} function rebuild(){grid.clear();for(const e of entities){const ix=Math.floor((e.x+world.bounds)/cell),iz=Math.floor((e.z+world.bounds)/cell),k=gkey(ix,iz);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}} function near(x,z,r){const ix0=Math.floor((x+world.bounds)/cell),iz0=Math.floor((z+world.bounds)/cell),sp=Math.ceil(r/cell);const out=[];for(let dz=-sp;dz<=sp;dz++){for(let dx=-sp;dx<=sp;dx++){const k=gkey(ix0+dx,iz0+dz),arr=grid.get(k);if(!arr)continue;for(const e of arr){const dx2=e.x-x,dz2=e.z-z;if(dx2*dx2+dz2*dz2<=r*r)out.push(e);}}}return out;}
 // lifecycle
-function init(seed,count,cap){randState=seed>>>0;entities=[];plants=[];devices=[];nextId=1;nextSpeciesId=1;treeNodes=[];world.simCap=cap||world.simCap;generateMap({seed,size:96,step:0.3,slope:1.1,mount:1.0,rivers:true,biomes:['plains','forest','desert','wetland','tundra']});for(let i=0;i<count;i++)entities.push(spawnEntity(nextId++));for(let i=0;i<40;i++)plants.push(spawnPlant());snapshot();}
+function init(seed,count,cap){randState=seed>>>0;entities=[];devices=[];nextId=1;nextSpeciesId=1;treeNodes=[];world.simCap=cap||world.simCap;generateMap({seed,size:96,step:0.3,slope:1.1,mount:1.0,rivers:true,biomes:['plains','forest','desert','wetland','tundra']});for(let i=0;i<count;i++)entities.push(spawnEntity(nextId++));snapshot();}
 function tick(dt){
   const tiles=map.size*map.size;
   for(let i=0;i<tiles;i++){
@@ -69,7 +97,8 @@ function tick(dt){
     if(inWater)e.hydration=Math.max(e.hydration,Math.min(1.0,e.hydration+0.5*dt)); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
     if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>1.5&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
     e.yaw=Math.atan2(e.vx,e.vz);
-  } for(const p of plants){p.x+=Math.sin(world.t*0.05+p.x)*0.002;p.z+=Math.cos(world.t*0.05+p.z)*0.002;}}
+  }
+}
 function snapshot(){
   const list=new Array(entities.length);
   for(let i=0;i<entities.length;i++){
