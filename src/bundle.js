@@ -67,6 +67,7 @@
     return new this._THREE.Color().setHSL(hue,0.85,(e.mode==='swim'?0.65:0.55));
   };
   CMesh.prototype.update=function(list){
+    const CREATURE_SCALE = 0.1;
     const seen=new Set();
     const n=Math.min(list.length,this.cap);
     this._time=(this._time||0)+0.1;const t=this._time;
@@ -75,7 +76,7 @@
       let obj=this.objects.get(e.id);
       if(!obj){obj=this._create();this.objects.set(e.id,obj);this.group.add(obj.group);}
       seen.add(e.id);
-      const s=0.35+(e.genes.size||0)*0.9+(e.mode==='swim'?-0.1:0);
+      const s=(0.35+(e.genes.size||0)*0.9+(e.mode==='swim'?-0.1:0))*CREATURE_SCALE;
       const tiltX=(e.vz||0)*0.06,tiltZ=-(e.vx||0)*0.06;
       obj.group.position.set(e.x,e.y,e.z);
       obj.group.rotation.set(tiltX,e.yaw||0,tiltZ);
