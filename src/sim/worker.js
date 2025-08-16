@@ -25,8 +25,8 @@ function generateMap(p){const N=p.size||96;map.size=N;map.heights=new Float32Arr
     for(let x=0;x<N;x++){
       const i=z*N+x,e=map.heights[i], temp=1-Math.abs((z/N)*2-1), moist=noise2d(x*0.05,z*0.05,seed+4242);
       let b=0;if(e<map.waterLevel&&ok('wetland'))b=3;else if(temp<0.25&&ok('tundra'))b=4;else if(moist<0.28&&ok('desert'))b=2;else if(moist>0.65&&ok('forest'))b=1;else b=0;map.biomes[i]=b;
-      let max=0.6,regen=0.02;
-      if(b===1){max=1.0;regen=0.04;} else if(b===2){max=0.3;regen=0.005;} else if(b===3){max=0.8;regen=0.03;} else if(b===4){max=0.5;regen=0.015;}
+      let max=0.6,regen=0.01;
+      if(b===1){max=1.0;regen=0.02;} else if(b===2){max=0.3;regen=0.0025;} else if(b===3){max=0.8;regen=0.015;} else if(b===4){max=0.5;regen=0.0075;}
       map.resMax[i]=max;map.resources[i]=max;map.resRegen[i]=regen;
     }
   }
@@ -85,7 +85,7 @@ function tick(dt){
   const tiles=map.size*map.size;
   for(let i=0;i<tiles;i++){
     const cur=map.resources[i],max=map.resMax[i];
-    map.resources[i]=Math.min(max,cur+(max-cur)*map.resRegen[i]*dt);
+    map.resources[i]=Math.min(max,cur+max*map.resRegen[i]*dt);
   }
   world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
   for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.005*dt*(1+(e.genes.diet===1?0.4:0));const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
