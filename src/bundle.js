@@ -56,9 +56,11 @@
     const legGeo=new this._THREE.BoxGeometry(1,1,1);
     const legs=[];for(let i=0;i<4;i++){legs.push(new this._THREE.Mesh(legGeo,mat));}
     const tail=new this._THREE.Mesh(new this._THREE.BoxGeometry(1,1,1),mat);
+    const finGeo=new this._THREE.BoxGeometry(1,0.2,0.5);
+    const fins=[new this._THREE.Mesh(finGeo,mat),new this._THREE.Mesh(finGeo,mat)];fins.forEach(f=>f.visible=false);
     const g=new this._THREE.Group();
-    g.add(body);g.add(head);legs.forEach(l=>g.add(l));g.add(tail);
-    return {group:g,material:mat,body,head,legs,tail};
+    g.add(body);g.add(head);legs.forEach(l=>g.add(l));g.add(tail);fins.forEach(f=>g.add(f));
+    return {group:g,material:mat,body,head,legs,tail,fins};
   };
   CMesh.prototype._colorFrom=function(e){
     const warm=e.genes.diet===1;
@@ -76,21 +78,42 @@
       let obj=this.objects.get(e.id);
       if(!obj){obj=this._create();this.objects.set(e.id,obj);this.group.add(obj.group);}
       seen.add(e.id);
-      const s=(0.35+(e.genes.size||0)*0.9+(e.mode==='swim'?-0.1:0))*CREATURE_SCALE;
+      const g=e.genes||{}; // trait mapping: size->scale, speed->legs, climb->leg thickness, swim->tail+fins, social->head
+      const s=(0.35+(g.size||0)*0.9+(e.mode==='swim'?-0.1:0))*CREATURE_SCALE;
       const tiltX=(e.vz||0)*0.06,tiltZ=-(e.vx||0)*0.06;
       obj.group.position.set(e.x,e.y,e.z);
       obj.group.rotation.set(tiltX,e.yaw||0,tiltZ);
+
+      // basic body dimensions
       const bodyLen=s*2.0;
       obj.body.scale.set(s*1.2,s*0.7,bodyLen);
+
+      // social -> head size
+      const headScale=s*(0.6+(g.social||0)*0.4);
       obj.head.position.set(0,0,bodyLen*0.5);
-      obj.head.scale.set(s*0.6,s*0.6,s*0.6);
-      const legLen=s*(0.7+(e.genes.speed||0));
-      const legThick=s*(0.2+(e.genes.climb||0)*0.3);
+      obj.head.scale.set(headScale,headScale,headScale);
+
+      // speed -> leg length, climb -> leg thickness
+      const legLen=s*(0.7+(g.speed||0));
+      const legThick=s*(0.2+(g.climb||0)*0.3);
       const legPos=[[ -s*0.4,-legLen/2, bodyLen*0.25],[ s*0.4,-legLen/2, bodyLen*0.25],[ -s*0.4,-legLen/2,-bodyLen*0.25],[ s*0.4,-legLen/2,-bodyLen*0.25]];
       for(let i=0;i<4;i++){const leg=obj.legs[i];leg.scale.set(legThick,legLen,legThick);leg.position.set(legPos[i][0],legPos[i][1],legPos[i][2]);}
-      const tailLen=s*(0.5+(e.genes.swim||0));
+
+      // swim -> tail length and fins
+      const tailLen=s*(0.5+(g.swim||0));
       obj.tail.scale.set(legThick*0.6,legThick*0.6,tailLen);
       obj.tail.position.set(0,0,-bodyLen*0.5-tailLen*0.5);
+      const hasFins=(g.swim||0)>0.5;
+      if(obj.fins){
+        obj.fins.forEach((f,i)=>{
+          f.visible=hasFins;
+          if(hasFins){
+            const finScale=s*(0.5+(g.swim||0)*0.5);
+            f.scale.set(finScale,finScale*0.2,finScale);
+            f.position.set(i===0?-s*0.6:s*0.6,0,bodyLen*0.2);
+          }
+        });
+      }
       const sp=Math.sqrt((e.vx||0)**2+(e.vz||0)**2);const amp=Math.min(1,sp*3);
       const phase=t*(e.mode==='swim'?4:8)+e.id;
       if(e.mode==='swim'){
