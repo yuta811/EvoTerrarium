@@ -47,120 +47,100 @@
     this.group=new THREE.Group();
     this.mesh=this.group;
     this._THREE=THREE;
-    const mat=new this._THREE.MeshLambertMaterial({vertexColors:true});
-    this.material=mat;
-    this.body=new this._THREE.InstancedMesh(new this._THREE.BoxGeometry(1,1,1),mat,cap);
-    this.head=new this._THREE.InstancedMesh(new this._THREE.BoxGeometry(1,1,1),mat,cap);
-    this.tail=new this._THREE.InstancedMesh(new this._THREE.BoxGeometry(1,1,1),mat,cap);
-    this.legs=new this._THREE.InstancedMesh(new this._THREE.BoxGeometry(1,1,1),mat,cap*4);
-    this.fins=new this._THREE.InstancedMesh(new this._THREE.BoxGeometry(1,0.2,0.5),mat,cap*2);
-    this.group.add(this.body);
-    this.group.add(this.head);
-    this.group.add(this.tail);
-    this.group.add(this.legs);
-    this.group.add(this.fins);
-    this._tmpObj=new this._THREE.Object3D();
-    this._color=new this._THREE.Color();
+    this.objects=new Map();
   }
+  CMesh.prototype._create=function(){
+    const mat=new this._THREE.MeshLambertMaterial({color:0xffffff});
+    const body=new this._THREE.Mesh(new this._THREE.BoxGeometry(1,1,1),mat);
+    const head=new this._THREE.Mesh(new this._THREE.BoxGeometry(1,1,1),mat);
+    const legGeo=new this._THREE.BoxGeometry(1,1,1);
+    const legs=[];for(let i=0;i<4;i++){legs.push(new this._THREE.Mesh(legGeo,mat));}
+    const tail=new this._THREE.Mesh(new this._THREE.BoxGeometry(1,1,1),mat);
+    const finGeo=new this._THREE.BoxGeometry(1,0.2,0.5);
+    const fins=[new this._THREE.Mesh(finGeo,mat),new this._THREE.Mesh(finGeo,mat)];fins.forEach(f=>f.visible=false);
+    const g=new this._THREE.Group();
+    g.add(body);g.add(head);legs.forEach(l=>g.add(l));g.add(tail);fins.forEach(f=>g.add(f));
+    return {group:g,material:mat,body,head,legs,tail,fins};
+  };
   CMesh.prototype._colorFrom=function(e){
     const warm=e.genes.diet===1;
     const base=warm?0.0:0.55;
     const hue=(base+((e.species*0.61803398875)%0.15))%1;
     return new this._THREE.Color().setHSL(hue,0.85,(e.mode==='swim'?0.65:0.55));
   };
-  CMesh.prototype.update=function(list,camera){
-    const THREE=this._THREE;
-    const CREATURE_SCALE=0.25;
-    const tmp=this._tmpObj;
-    const col=this._color;
-    const proj=new THREE.Matrix4();
-    const frustum=new THREE.Frustum();
-    camera.updateMatrixWorld();
-    proj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
-    frustum.setFromProjectionMatrix(proj);
-    const camPos=camera.position;
-    const maxDistSq=100*100;
-    let b=0,h=0,tidx=0,l=0,f=0;
-    this._time=(this._time||0)+0.1;const time=this._time;
-    const v=new THREE.Vector3();
-    const q=new THREE.Quaternion();
-    const q2=new THREE.Quaternion();
-    const v2=new THREE.Vector3();
-    for(let idx=0;idx<list.length && b<this.cap;idx++){
+  CMesh.prototype.update=function(list){
+    const CREATURE_SCALE = 0.25;
+    const seen=new Set();
+    const n=Math.min(list.length,this.cap);
+    this._time=(this._time||0)+0.1;const t=this._time;
+    for(let idx=0;idx<n;idx++){
       const e=list[idx];
-      v.set(e.x,e.y,e.z);
-      if(camPos.distanceToSquared(v)>maxDistSq)continue;
-      if(!frustum.containsPoint(v))continue;
-      const g=e.genes||{};
+      let obj=this.objects.get(e.id);
+      if(!obj){obj=this._create();this.objects.set(e.id,obj);this.group.add(obj.group);}
+      seen.add(e.id);
+      const g=e.genes||{}; // trait mapping: size->scale, speed->legs, climb->leg thickness, swim->tail+fins, social->head
       const s=(0.35+(g.size||0)*0.9+(e.mode==='swim'?-0.1:0))*CREATURE_SCALE;
       const tiltX=(e.vz||0)*0.06,tiltZ=-(e.vx||0)*0.06;
-      q.setFromEuler(new THREE.Euler(tiltX,e.yaw||0,tiltZ));
-      const colV=this._colorFrom(e);col.copy(colV);
+      obj.group.position.set(e.x,e.y,e.z);
+      obj.group.rotation.set(tiltX,e.yaw||0,tiltZ);
 
-      // body
+      // basic body dimensions
       const bodyLen=s*2.0;
-      tmp.position.copy(v);
-      tmp.quaternion.copy(q);
-      tmp.scale.set(s*1.2,s*0.7,bodyLen);
-      tmp.updateMatrix();
-      this.body.setMatrixAt(b,tmp.matrix);this.body.setColorAt(b,col);
+      obj.body.scale.set(s*1.2,s*0.7,bodyLen);
 
-      // head
+      // social -> head size
       const headScale=s*(0.6+(g.social||0)*0.4);
-      v2.set(0,0,bodyLen*0.5).applyQuaternion(q).add(v);
-      q2.copy(q);
-      const sp=Math.sqrt((e.vx||0)**2+(e.vz||0)**2);const amp=Math.min(1,sp*3);const phase=time*(e.mode==='swim'?4:8)+e.id;
-      if(e.mode==='swim')q2.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0,Math.sin(phase+Math.PI/2)*0.3*amp,0)));
-      else q2.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(phase*0.5)*0.2*amp,0,0)));
-      tmp.position.copy(v2);tmp.quaternion.copy(q2);tmp.scale.set(headScale,headScale,headScale);tmp.updateMatrix();
-      this.head.setMatrixAt(h,tmp.matrix);this.head.setColorAt(h,col);
+      obj.head.position.set(0,0,bodyLen*0.5);
+      obj.head.scale.set(headScale,headScale,headScale);
 
-      // legs
+      // speed -> leg length, climb -> leg thickness
       const legLen=s*(0.7+(g.speed||0));
       const legThick=s*(0.2+(g.climb||0)*0.3);
-      const legPos=[[-s*0.4,-legLen/2,bodyLen*0.25],[s*0.4,-legLen/2,bodyLen*0.25],[-s*0.4,-legLen/2,-bodyLen*0.25],[s*0.4,-legLen/2,-bodyLen*0.25]];
-      for(let i=0;i<4;i++){
-        v2.set(legPos[i][0],legPos[i][1],legPos[i][2]).applyQuaternion(q).add(v);
-        q2.copy(q);
-        if(e.mode==='swim')q2.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0,0,Math.sin(phase+(i%2===0?0:Math.PI))*0.5*amp)));
-        else q2.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(phase+(i%2===0?0:Math.PI))*0.8*amp,0,0)));
-        tmp.position.copy(v2);tmp.quaternion.copy(q2);tmp.scale.set(legThick,legLen,legThick);tmp.updateMatrix();
-        this.legs.setMatrixAt(l,tmp.matrix);this.legs.setColorAt(l,col);l++;
-      }
+      const legPos=[[ -s*0.4,-legLen/2, bodyLen*0.25],[ s*0.4,-legLen/2, bodyLen*0.25],[ -s*0.4,-legLen/2,-bodyLen*0.25],[ s*0.4,-legLen/2,-bodyLen*0.25]];
+      for(let i=0;i<4;i++){const leg=obj.legs[i];leg.scale.set(legThick,legLen,legThick);leg.position.set(legPos[i][0],legPos[i][1],legPos[i][2]);}
 
-      // tail
+      // swim -> tail length and fins
       const tailLen=s*(0.5+(g.swim||0));
-      v2.set(0,0,-bodyLen*0.5-tailLen*0.5).applyQuaternion(q).add(v);
-      q2.copy(q);
-      if(e.mode==='swim')q2.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0,Math.sin(phase)*0.8*amp,0)));
-      else q2.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0,Math.sin(phase)*0.3*amp,0)));
-      tmp.position.copy(v2);tmp.quaternion.copy(q2);tmp.scale.set(legThick*0.6,legThick*0.6,tailLen);tmp.updateMatrix();
-      this.tail.setMatrixAt(tidx,tmp.matrix);this.tail.setColorAt(tidx,col);
-
-      // fins
+      obj.tail.scale.set(legThick*0.6,legThick*0.6,tailLen);
+      obj.tail.position.set(0,0,-bodyLen*0.5-tailLen*0.5);
       const hasFins=(g.swim||0)>0.5;
-      if(hasFins){
-        const finScale=s*(0.5+(g.swim||0)*0.5);
-        for(let i=0;i<2;i++){
-          v2.set(i===0?-s*0.6:s*0.6,0,bodyLen*0.2).applyQuaternion(q).add(v);
-          q2.copy(q);
-          tmp.position.copy(v2);tmp.quaternion.copy(q2);tmp.scale.set(finScale,finScale*0.2,finScale);tmp.updateMatrix();
-          this.fins.setMatrixAt(f,tmp.matrix);this.fins.setColorAt(f,col);f++;
-        }
+      if(obj.fins){
+        obj.fins.forEach((f,i)=>{
+          f.visible=hasFins;
+          if(hasFins){
+            const finScale=s*(0.5+(g.swim||0)*0.5);
+            f.scale.set(finScale,finScale*0.2,finScale);
+            f.position.set(i===0?-s*0.6:s*0.6,0,bodyLen*0.2);
+          }
+        });
       }
-      b++;h++;tidx++;
+      const sp=Math.sqrt((e.vx||0)**2+(e.vz||0)**2);const amp=Math.min(1,sp*3);
+      const phase=t*(e.mode==='swim'?4:8)+e.id;
+      if(e.mode==='swim'){
+        for(let i=0;i<4;i++){const leg=obj.legs[i];leg.rotation.set(0,0,Math.sin(phase+(i%2===0?0:Math.PI))*0.5*amp);}
+        obj.tail.rotation.set(0,Math.sin(phase)*0.8*amp,0);
+        obj.head.rotation.set(0,Math.sin(phase+Math.PI/2)*0.3*amp,0);
+      }else{
+        for(let i=0;i<4;i++){const leg=obj.legs[i];leg.rotation.set(Math.sin(phase+(i%2===0?0:Math.PI))*0.8*amp,0,0);} 
+        obj.tail.rotation.set(0,Math.sin(phase)*0.3*amp,0);
+        obj.head.rotation.set(Math.sin(phase*0.5)*0.2*amp,0,0);
+      }
+      const col=this._colorFrom(e);obj.material.color.copy(col);
     }
-    this.body.count=b;this.head.count=h;this.tail.count=tidx;this.legs.count=l;this.fins.count=f;
-    this.body.instanceMatrix.needsUpdate=true;this.head.instanceMatrix.needsUpdate=true;this.tail.instanceMatrix.needsUpdate=true;this.legs.instanceMatrix.needsUpdate=true;this.fins.instanceMatrix.needsUpdate=true;
-    if(this.body.instanceColor){this.body.instanceColor.needsUpdate=true;this.head.instanceColor.needsUpdate=true;this.tail.instanceColor.needsUpdate=true;this.legs.instanceColor.needsUpdate=true;this.fins.instanceColor.needsUpdate=true;}
+    for(const [id,obj] of this.objects){
+      if(!seen.has(id)){
+        this.group.remove(obj.group);
+        obj.group.traverse(n=>{n.geometry&&n.geometry.dispose&&n.geometry.dispose();});
+        obj.material.dispose();
+        this.objects.delete(id);
+      }
+    }
   };
   CMesh.prototype.dispose=function(){
-    this.body.dispose();
-    this.head.dispose();
-    this.tail.dispose();
-    this.legs.dispose();
-    this.fins.dispose();
-    this.material.dispose();
+    for(const [id,obj] of this.objects){
+      obj.group.traverse(n=>{n.geometry&&n.geometry.dispose&&n.geometry.dispose();if(n.material&&n.material.dispose) n.material.dispose();});
+    }
+    this.objects.clear();
   };
   const d=(m)=>{const el=document.getElementById('diag');if(el)el.textContent='diag: '+m;console.log('[diag]',m);};
   const container=document.getElementById('app');d('engine constructing');const engine=new Engine3D(container);engine.onResize();
@@ -171,7 +151,7 @@
   function showTree(v){treeCanvas.style.display=v?'block':'none';if(v)drawTree();}
   treeCanvas.addEventListener('click',e=>{const s=(window.devicePixelRatio||1),r=treeCanvas.getBoundingClientRect();const x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;for(const n of treeData.nodes){const dx=x-n._x,dy=y-n._y;if(dx*dx+dy*dy<14*14*s){sim&&sim.postMessage({type:'selectSpecies',payload:{species:n.id}});showTree(false);break;}}});
   function applyMap(data){engine.rebuildTerrain(data);}
-  if(sim){sim.onmessage=(e)=>{const t=e.data.type,p=e.data.payload;if(t==='state'){creatures.update(p.entities,engine.camera);engine.updateTerrain(p.world);engine.updateDevices(p.devices||[]);statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)}`;d('state ok');}else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}};sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:200,simCap:parseInt(document.getElementById('simCap').value,10)}});} 
+  if(sim){sim.onmessage=(e)=>{const t=e.data.type,p=e.data.payload;if(t==='state'){creatures.update(p.entities);engine.updateTerrain(p.world);engine.updateDevices(p.devices||[]);statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)}`;d('state ok');}else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}};sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:200,simCap:parseInt(document.getElementById('simCap').value,10)}});}
   engine.start();
   seasonSpeed.addEventListener('input',function(){sim&&sim.postMessage({type:'seasonSpeed',payload:parseFloat(this.value)})});
   document.getElementById('cap').addEventListener('input',function(){const v=parseInt(this.value,10);if(v!==creatures.cap){engine.scene.remove(creatures.mesh);creatures.dispose&&creatures.dispose();creatures=new CMesh(v);engine.scene.add(creatures.mesh);}});
