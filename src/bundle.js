@@ -69,10 +69,11 @@
   CMesh.prototype.update=function(list){
     const seen=new Set();
     const n=Math.min(list.length,this.cap);
+    this._time=(this._time||0)+0.1;const t=this._time;
     for(let idx=0;idx<n;idx++){
       const e=list[idx];
       let obj=this.objects.get(e.id);
-      if(!obj){obj=this._create();this.objects.set(e.id,obj);this.group.add(obj.group);} 
+      if(!obj){obj=this._create();this.objects.set(e.id,obj);this.group.add(obj.group);}
       seen.add(e.id);
       const s=0.35+(e.genes.size||0)*0.9+(e.mode==='swim'?-0.1:0);
       const tiltX=(e.vz||0)*0.06,tiltZ=-(e.vx||0)*0.06;
@@ -89,6 +90,17 @@
       const tailLen=s*(0.5+(e.genes.swim||0));
       obj.tail.scale.set(legThick*0.6,legThick*0.6,tailLen);
       obj.tail.position.set(0,0,-bodyLen*0.5-tailLen*0.5);
+      const sp=Math.sqrt((e.vx||0)**2+(e.vz||0)**2);const amp=Math.min(1,sp*3);
+      const phase=t*(e.mode==='swim'?4:8)+e.id;
+      if(e.mode==='swim'){
+        for(let i=0;i<4;i++){const leg=obj.legs[i];leg.rotation.set(0,0,Math.sin(phase+(i%2===0?0:Math.PI))*0.5*amp);}
+        obj.tail.rotation.set(0,Math.sin(phase)*0.8*amp,0);
+        obj.head.rotation.set(0,Math.sin(phase+Math.PI/2)*0.3*amp,0);
+      }else{
+        for(let i=0;i<4;i++){const leg=obj.legs[i];leg.rotation.set(Math.sin(phase+(i%2===0?0:Math.PI))*0.8*amp,0,0);} 
+        obj.tail.rotation.set(0,Math.sin(phase)*0.3*amp,0);
+        obj.head.rotation.set(Math.sin(phase*0.5)*0.2*amp,0,0);
+      }
       const col=this._colorFrom(e);obj.material.color.copy(col);
     }
     for(const [id,obj] of this.objects){
