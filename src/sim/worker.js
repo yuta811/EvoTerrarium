@@ -3,6 +3,12 @@
 let entities=[],devices=[];
 let world={t:0,bounds:28,season:0,seasonSpeed:1,simCap:4000};
 const CREATURE_SCALE = 0.25;
+// Foraging and resource search tuning constants (provisional)
+const FORAGE_NEAR_RES_COEF = 0.5;      // influence of nearby resource scarcity
+const FORAGE_ENERGY_DEFICIT_COEF = 0.7; // influence of creature's energy deficit
+const RES_GRAD_BASE = 0.9;              // base acceleration from resource gradient
+const RES_GRAD_LOW_RES_BOOST = 1.5;     // extra boost when resources are scarce
+const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 // Map
@@ -81,11 +87,24 @@ function tick(dt){
   for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.005*dt*(1+(e.genes.diet===1?0.4:0));const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
     const hunger=1-Math.max(0,Math.min(1,e.energy)),thirst=1-Math.max(0,Math.min(1,e.hydration));
-    let U_forage=(e.genes.diet===0?0.6:0.25)*(food+0.2*comfort)+0.2*hunger; let U_drink=Math.max(0,thirst*0.8+(atWater?0.5:0)); let U_mate=(e.energy>1.2&&e.cooldown<=0)?(0.3+e.genes.social*0.4):0.0; let U_rest=(e.energy<0.3?0.6:0.1)*(1-comfort);
+    const localRes=map.resources[mapCoord(e.x,e.z).i];
+    const energyDeficit=hunger;
+    let U_forage=(e.genes.diet===0?0.6:0.25)*(food+0.2*comfort)+0.2*hunger;
+    U_forage*=1+FORAGE_NEAR_RES_COEF*(1-localRes);
+    U_forage*=1+FORAGE_ENERGY_DEFICIT_COEF*energyDeficit;
+    let U_drink=Math.max(0,thirst*0.8+(atWater?0.5:0)); let U_mate=(e.energy>1.2&&e.cooldown<=0)?(0.3+e.genes.social*0.4):0.0; let U_rest=(e.energy<0.3?0.6:0.1)*(1-comfort);
     let fleeX=0,fleeZ=0,chaseX=0,chaseZ=0,prey=0; for(const o of ar){if(o===e)continue;const dx=o.x-e.x,dz=o.z-e.z;const d=Math.sqrt(dx*dx+dz*dz)+1e-6; if(e.genes.diet===0&&o.genes.diet===1&&d<s){U_rest=0;U_mate=0;fleeX-=dx/d*(1.5-d/s);fleeZ-=dz/d*(1.5-d/s);} if(e.genes.diet===1&&o.genes.diet===0&&d<s){chaseX+=dx/d*(1.5-d/s);chaseZ+=dz/d*(1.5-d/s);prey++;}}
     if(prey>0)U_forage=Math.max(U_forage,0.25);
     let ax=0,az=0; let sepX=0,sepZ=0,aliX=0,aliZ=0,cohX=0,cohZ=0, nali=0,ncoh=0; for(const o of ar){if(o===e)continue;const dx=e.x-o.x,dz=e.z-o.z;const d=Math.sqrt(dx*dx+dz*dz)+1e-6; if(d<1.0){const f=(1.0-d);sepX+=(dx/d)*f;sepZ+=(dz/d)*f;} if(o.genes.diet===e.genes.diet){aliX+=o.vx;aliZ+=o.vz;nali++;cohX+=o.x;cohZ+=o.z;ncoh++;}} if(nali>0){aliX/=nali;aliZ/=nali;} if(ncoh>0){cohX=(cohX/ncoh-e.x);cohZ=(cohZ/ncoh-e.z);} ax+=sepX*1.6+aliX*0.12*e.genes.social+cohX*0.08*e.genes.social; az+=sepZ*1.6+aliZ*0.12*e.genes.social+cohZ*0.08*e.genes.social;
-    const gx=plantRichnessAt(e.x+0.8,e.z)-plantRichnessAt(e.x-0.8,e.z),gz=plantRichnessAt(e.x,e.z+0.8)-plantRichnessAt(e.x,e.z-0.8); if(e.genes.diet===0){ax+=gx*0.9;az+=gz*0.9;} if(thirst>0.3){const hR=heightRawAt(e.x+0.6,e.z)-heightRawAt(e.x-0.6,e.z), hU=heightRawAt(e.x,e.z+0.6)-heightRawAt(e.x,e.z-0.6); ax+=-hR*0.9*thirst; az+=-hU*0.9*thirst;}
+    const resR=map.resources[mapCoord(e.x+0.8,e.z).i],resL=map.resources[mapCoord(e.x-0.8,e.z).i];
+    const resU=map.resources[mapCoord(e.x,e.z+0.8).i],resD=map.resources[mapCoord(e.x,e.z-0.8).i];
+    const gx=resR-resL,gz=resU-resD;
+    if(e.genes.diet===0){
+      const need=Math.max(0,RES_LOW_THRESHOLD-localRes)/RES_LOW_THRESHOLD;
+      const gradCoef=RES_GRAD_BASE*(1+need*RES_GRAD_LOW_RES_BOOST);
+      ax+=gx*gradCoef; az+=gz*gradCoef;
+    }
+    if(thirst>0.3){const hR=heightRawAt(e.x+0.6,e.z)-heightRawAt(e.x-0.6,e.z), hU=heightRawAt(e.x,e.z+0.6)-heightRawAt(e.x,e.z-0.6); ax+=-hR*0.9*thirst; az+=-hU*0.9*thirst;}
     ax+=chaseX*1.2+fleeX*1.7; az+=chaseZ*1.2+fleeZ*1.7;
     const sl=slopeAt(e.x,e.z); const avoidSlope=Math.max(0,sl-(0.10+0.15*e.genes.climb)); const inWater=heightRawAt(e.x,e.z)<map.waterLevel; e.mode=inWater?'swim':'walk';
     const acc=0.6+e.genes.speed*0.9; e.vx+=ax*acc*dt; e.vz+=az*acc*dt;
