@@ -43,7 +43,13 @@ function plantRichnessAt(x,z){let best=0.0;for(const p of plants){const dx=p.x-x
 const cell=3.0;let grid=new Map();function gkey(ix,iz){return (ix<<16)|(iz&0xffff);} function rebuild(){grid.clear();for(const e of entities){const ix=Math.floor((e.x+world.bounds)/cell),iz=Math.floor((e.z+world.bounds)/cell),k=gkey(ix,iz);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}} function near(x,z,r){const ix0=Math.floor((x+world.bounds)/cell),iz0=Math.floor((z+world.bounds)/cell),sp=Math.ceil(r/cell);const out=[];for(let dz=-sp;dz<=sp;dz++){for(let dx=-sp;dx<=sp;dx++){const k=gkey(ix0+dx,iz0+dz),arr=grid.get(k);if(!arr)continue;for(const e of arr){const dx2=e.x-x,dz2=e.z-z;if(dx2*dx2+dz2*dz2<=r*r)out.push(e);}}}return out;}
 // lifecycle
 function init(seed,count,cap){randState=seed>>>0;entities=[];plants=[];devices=[];nextId=1;nextSpeciesId=1;treeNodes=[];world.simCap=cap||world.simCap;generateMap({seed,size:96,step:0.3,slope:1.1,mount:1.0,rivers:true,biomes:['plains','forest','desert','wetland','tundra']});for(let i=0;i<count;i++)entities.push(spawnEntity(nextId++));for(let i=0;i<40;i++)plants.push(spawnPlant());snapshot();}
-function tick(dt){world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
+function tick(dt){
+  const tiles=map.size*map.size;
+  for(let i=0;i<tiles;i++){
+    const cur=map.resources[i],max=map.resMax[i];
+    map.resources[i]=Math.min(max,cur+(max-cur)*map.resRegen[i]*dt);
+  }
+  world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
   for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.005*dt*(1+(e.genes.diet===1?0.4:0));const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
     const hunger=1-Math.max(0,Math.min(1,e.energy)),thirst=1-Math.max(0,Math.min(1,e.hydration));
