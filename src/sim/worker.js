@@ -1,6 +1,6 @@
 
 // Worker v9 (terrain-following + natural selection + speciation)
-let entities=[],devices[];
+let entities=[], devices=[];
 let world={t:0,bounds:28,season:0,seasonSpeed:1,simCap:4000,resourceScale:1.0};
 let resourceScale=1.0;
 const CREATURE_SCALE = 0.25;
