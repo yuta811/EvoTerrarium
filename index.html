@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>EvoTerrarium 3D v9</title>
+  <link rel="stylesheet" href="./public/styles.css">
+</head>
+<body>
+  <div id="app" data-version="v9"></div>
+
+  <div id="panel">
+    <div class="row">
+      <label>季節速度</label><input id="seasonSpeed" type="range" min="0" max="2" step="0.01" value="1">
+      <label>描画上限</label><input id="cap" type="range" min="500" max="6000" step="100" value="2500">
+      <label>総数上限</label><input id="simCap" type="range" min="500" max="12000" step="500" value="4000">
+      <button id="treeBtn">系統樹</button>
+    </div>
+    <div class="row">
+      <button id="regen">地形再生成</button>
+      <label>Seed</label><input id="seed" type="number" value="0" style="width:130px">
+      <label>段差</label><input id="step" type="range" min="0" max="0.6" value="0.3" step="0.01">
+      <label>起伏</label><input id="slope" type="range" min="0.4" max="1.8" value="1.1" step="0.01">
+      <label>山岳度</label><input id="mount" type="range" min="0" max="1.8" value="1.0" step="0.01">
+      <label><input type="checkbox" id="rivers" checked>河川</label>
+      <span class="sep"></span>
+      <label><input type="checkbox" class="biome" value="plains" checked>草原</label>
+      <label><input type="checkbox" class="biome" value="forest" checked>森林</label>
+      <label><input type="checkbox" class="biome" value="desert" checked>砂漠</label>
+      <label><input type="checkbox" class="biome" value="wetland" checked>湿地</label>
+      <label><input type="checkbox" class="biome" value="tundra" checked>ツンドラ</label>
+    </div>
+    <div class="row">
+      <div id="modes">
+        <button data-mode="select" class="on">選択</button>
+        <button data-mode="sprinkler">スプリンクラー</button>
+        <button data-mode="heater">ヒーター</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="tree" style="position:fixed;top:0;left:0;width:100vw;height:100vh;display:none;pointer-events:auto;"></canvas>
+
+  <div id="hud">
+    <div class="pill" id="stats">booting…</div>
+    <div class="pill" id="diag">diag: html</div>
+    <div class="pill">tap: 選択 / pinch: ズーム / 2指: パン</div>
+  </div>
+
+  <script>
+  (function(){
+    const d=(m)=>{ const el=document.getElementById('diag'); if(el) el.textContent='diag: '+m; console.log('[diag]',m); };
+    window.addEventListener('error', e=>d('err: '+e.message));
+    window.addEventListener('unhandledrejection', e=>d('rej: '+(e.reason&&e.reason.message||e.reason)));
+    const seed=document.getElementById('seed'); if(seed.value==='0'){ seed.value=Date.now(); }
+    d('boot');
+  })();
+  </script>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="./src/bundle.js"></script>
+</body>
+</html>
