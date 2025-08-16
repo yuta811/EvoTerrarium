@@ -10,6 +10,7 @@ const FORAGE_ENERGY_DEFICIT_COEF = 0.7; // influence of creature's energy defici
 const RES_GRAD_BASE = 0.9;              // base acceleration from resource gradient
 const RES_GRAD_LOW_RES_BOOST = 1.5;     // extra boost when resources are scarce
 const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
+const BASAL_COMFORT_FACTOR = 0.5;
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 // Map
@@ -90,6 +91,7 @@ function tick(dt){
   world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
   for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.005*dt*(1+(e.genes.diet===1?0.4:0));const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
+    const comfortCoef = 1 + (1 - comfort) * BASAL_COMFORT_FACTOR;
     const hunger=1-Math.max(0,Math.min(1,e.energy)),thirst=1-Math.max(0,Math.min(1,e.hydration));
     const localRes=map.resources[mapCoord(e.x,e.z).i];
     const energyDeficit=hunger;
@@ -119,7 +121,7 @@ function tick(dt){
     const biome=b; const biomeMul=(biome===2?0.6:(biome===3?1.3:(biome===4?0.7:1.0)));
     let intake=(e.genes.diet===0)?(0.7*plantRichnessAt(e.x,e.z)*biomeMul):0;
     const moveCost=(0.002+0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0));
-    const basal=0.0008+0.0006*e.genes.size+(e.genes.diet===1?0.0006:0);
+    const basal=(0.0008+0.0006*e.genes.size+(e.genes.diet===1?0.0006:0))*comfortCoef;
     if(e.genes.diet===0){
       const {i}=mapCoord(e.x,e.z);
       const available=map.resources[i];
