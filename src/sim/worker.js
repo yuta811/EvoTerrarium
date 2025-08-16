@@ -55,5 +55,19 @@ function tick(dt){world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSp
     if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>1.5&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
     e.yaw=Math.atan2(e.vx,e.vz);
   } for(const p of plants){p.x+=Math.sin(world.t*0.05+p.x)*0.002;p.z+=Math.cos(world.t*0.05+p.z)*0.002;}}
-function snapshot(){const list=new Array(entities.length);for(let i=0;i<entities.length;i++){const e=entities[i],hue=(speciesHues[e.species]!==undefined?speciesHues[e.species]:0.35);list[i]={id:e.id,x:e.x,y:e.y,z:e.z,size:e.genes.size,hue:hue,yaw:e.yaw,diet:e.genes.diet,mode:e.mode,vx:e.vx,vz:e.vz};}postMessage({type:'state',payload:{entities:list,world,devices}});}
+function snapshot(){
+  const list=new Array(entities.length);
+  for(let i=0;i<entities.length;i++){
+    const e=entities[i];
+    list[i]={
+      id:e.id,x:e.x,y:e.y,z:e.z,yaw:e.yaw,mode:e.mode,vx:e.vx,vz:e.vz,
+      species:e.species,
+      genes:{
+        size:e.genes.size,speed:e.genes.speed,climb:e.genes.climb,swim:e.genes.swim,
+        thermo:e.genes.thermo,social:e.genes.social,diet:e.genes.diet
+      }
+    };
+  }
+  postMessage({type:'state',payload:{entities:list,world,devices}});
+}
 let timer=null; onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload; if(t==='init'){init((p&&p.seed)||1,(p&&p.entityCount)||200,p&&p.simCap||4000); if(timer)clearInterval(timer); const dt=0.1; timer=setInterval(()=>{tick(dt);snapshot();},100);} else if(t==='seasonSpeed'){world.seasonSpeed=p||1.0;} else if(t==='placeDevice'){devices.push({type:p.type,x:p.x,z:p.z,power:1.0,radius:5.0});} else if(t==='pickSelect'){let best=null,bd2=1e9;for(const ent of entities){const dx=ent.x-p.x,dz=ent.z-p.z,d2=dx*dx+dz*dz;if(d2<bd2){bd2=d2;best=ent;}} if(best)postMessage({type:'selected',payload:{x:best.x,z:best.z}});} else if(t==='regenMap'){generateMap(p||{seed:Date.now(),size:96,step:0.3,slope:1.1,mount:1.0,rivers:true});} else if(t==='getTree'){postMessage({type:'tree',payload:{nodes:treeNodes}});} else if(t==='selectSpecies'){postMessage({type:'rpgReady',payload:{species:p.species}});} else if(t==='simCap'){world.simCap=p||world.simCap;} }catch(err){postMessage({type:'error',payload:''+err});}};
