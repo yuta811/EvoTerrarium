@@ -162,6 +162,6 @@ let timer=null; onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload;
   else if(t==='regenMap'){generateMap(p||{seed:Date.now(),size:96,step:0.3,slope:1.1,mount:1.0,rivers:true});}
   else if(t==='getTree'){postMessage({type:'tree',payload:{nodes:treeNodes}});}
   else if(t==='selectSpecies'){postMessage({type:'rpgReady',payload:{species:p.species}});}
-  else if(t==='resourceScale'){const newValue=p||1.0;const factor=newValue/resourceScale;for(let i=0;i<map.resources.length;i++){map.resources[i]*=factor;map.resMax[i]*=factor;map.resRegen[i]*=factor;}resourceScale=newValue;world.resourceScale=newValue;snapshot();}
+  else if(t==='resourceScale'){const newValue = (p !== undefined) ? p : 1.0;const factor=newValue/resourceScale;for(let i=0;i<map.resources.length;i++){map.resources[i]*=factor;map.resMax[i]*=factor;map.resRegen[i]*=factor;}resourceScale=newValue;world.resourceScale=newValue;snapshot();}
   else if(t==='simCap'){world.simCap=p||world.simCap;}
  }catch(err){postMessage({type:'error',payload:''+err});}};
