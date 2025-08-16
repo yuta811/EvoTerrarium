@@ -138,6 +138,8 @@ function tick(dt){
   }
 }
 function snapshot(){
+  world.resources = map.resources;
+  world.resMax = map.resMax;
   const list=new Array(entities.length);
   for(let i=0;i<entities.length;i++){
     const e=entities[i];
