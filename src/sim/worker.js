@@ -13,6 +13,7 @@ const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
 const BASAL_COMFORT_FACTOR = 0.5;
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
+function maxEnergy(size){ return 1.0 + size * 2.0; }
 // Map
 const VERT=8.0; let map={size:96,heights:new Float32Array(96*96),biomes:new Uint8Array(96*96),resources:new Float32Array(96*96),resMax:new Float32Array(96*96),resRegen:new Float32Array(96*96),smooth:0.3,waterLevel:-0.18};
 function noise2d(x,y,seed){function h(n){const s=Math.sin(n*0.0007+seed*1e-6)*43758.5453;return s-Math.floor(s);}const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;function f(t){return t*t*(3-2*t);}const tl=h(xi*157+yi*311),tr=h((xi+1)*157+yi*311),bl=h(xi*157+(yi+1)*311),br=h((xi+1)*157+(yi+1)*311);const u=f(xf),v=f(yf);return lerp(lerp(tl,tr,u),lerp(bl,br,u),v);} function ridged(x,y,seed){const n=noise2d(x,y,seed);return 1-Math.abs(n*2-1);} function fbm2d(x,y,seed){let sum=0,amp=1,freq=1,total=0;for(let o=0;o<4;o++){sum+=amp*(noise2d(x*freq,y*freq,seed+o*1013)-0.5)*2;total+=amp;amp*=0.5;freq*=2;}return sum/total;}
@@ -72,8 +73,28 @@ let nextId=1,nextSpeciesId=1;const speciesHues={};let treeNodes=[];
 function regSpecies(id,parent){const hue=(speciesHues[id]!==undefined?speciesHues[id]:rand());treeNodes.push({id,parent:parent||0,birth:world.t,hue});}
 function gdist(a,b){return Math.abs(a.size-b.size)*0.8+Math.abs(a.speed-b.speed)*0.6+Math.abs(a.thermo-b.thermo)*0.8+Math.abs(a.climb-b.climb)*0.6+Math.abs(a.swim-b.swim)*0.6+Math.abs(a.social-b.social)*0.4+(a.diet!==b.diet?0.4:0);}
 function newGenes(base){return {size:clamp01((base&&base.size||0.5)+(rand()*2-1)*0.05),speed:clamp01((base&&base.speed||0.5)+(rand()*2-1)*0.05),thermo:clamp01((base&&base.thermo||rand())+(rand()*2-1)*0.03),climb:clamp01((base&&base.climb||rand())+(rand()*2-1)*0.03),swim:clamp01((base&&base.swim||rand())+(rand()*2-1)*0.03),social:clamp01((base&&base.social||rand())+(rand()*2-1)*0.03),diet:(base&&base.diet!==undefined)?base.diet:(rand()<0.15?1:0)};}
-function spawnEntity(id){const g=newGenes();const x=(rand()*2-1)*(world.bounds*0.6),z=(rand()*2-1)*(world.bounds*0.6);const sp=nextSpeciesId++;speciesHues[sp]=rand();regSpecies(sp,0);return {id,x,z,y:heightAtWorld(x,z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy:1.0,age:0.0,hydration:1.0,cooldown:rand()*6,genes:g,species:sp,mode:'walk',biomeExp:new Uint8Array(5)};}
-function reproduce(p){const cg=newGenes(p.genes);const fav=p.biomeExp?p.biomeExp.indexOf(Math.max(...p.biomeExp)):0;const drift=gdist(cg,p.genes)+((fav===2||fav===3)?0.05:0);let sp=p.species;if(drift>0.22){sp=++nextSpeciesId;speciesHues[sp]=rand();regSpecies(sp,p.species);}entities.push({id:nextId++,x:p.x+(rand()*2-1)*0.5,z:p.z+(rand()*2-1)*0.5,y:heightAtWorld(p.x,p.z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy:0.6,hydration:0.8,age:0.0,cooldown:4+rand()*4,genes:cg,species:sp,mode:'walk',biomeExp:new Uint8Array(5)});}
+function spawnEntity(id){
+  const g=newGenes();
+  const x=(rand()*2-1)*(world.bounds*0.6),z=(rand()*2-1)*(world.bounds*0.6);
+  const sp=nextSpeciesId++;
+  speciesHues[sp]=rand();
+  regSpecies(sp,0);
+  const energy=maxEnergy(g.size)*0.6;
+  return {id,x,z,y:heightAtWorld(x,z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,age:0.0,hydration:1.0,cooldown:rand()*6,genes:g,species:sp,mode:'walk',biomeExp:new Uint8Array(5)};
+}
+function reproduce(p){
+  const cg=newGenes(p.genes);
+  const fav=p.biomeExp?p.biomeExp.indexOf(Math.max(...p.biomeExp)):0;
+  const drift=gdist(cg,p.genes)+((fav===2||fav===3)?0.05:0);
+  let sp=p.species;
+  if(drift>0.22){
+    sp=++nextSpeciesId;
+    speciesHues[sp]=rand();
+    regSpecies(sp,p.species);
+  }
+  const energy=maxEnergy(cg.size)*0.6;
+  entities.push({id:nextId++,x:p.x+(rand()*2-1)*0.5,z:p.z+(rand()*2-1)*0.5,y:heightAtWorld(p.x,p.z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,hydration:0.8,age:0.0,cooldown:4+rand()*4,genes:cg,species:sp,mode:'walk',biomeExp:new Uint8Array(5)});
+}
 // env
 function comfortTempBase(z){return (Math.sin(z*0.07)*0.5+0.5);} function comfortTempWithDevices(x,z){let t=comfortTempBase(z);for(const d of devices){if(d.type!=='heater')continue;const dx=d.x-x,dz=d.z-z;const r2=dx*dx+dz*dz;const fall=Math.exp(-r2/(d.radius*d.radius));t=clamp01(t+d.power*0.25*fall);}return t;}
 function plantRichnessAt(x,z){
@@ -161,7 +182,8 @@ function tick(dt){
       e.energy-=(moveCost+basal);
     }
     if(inWater)e.hydration=Math.max(e.hydration,Math.min(1.0,e.hydration+0.5*dt)); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
-    if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>1.5&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
+    e.energy=Math.min(e.energy, maxEnergy(e.genes.size));
+    if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxEnergy(e.genes.size)*0.75&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
     e.yaw=Math.atan2(e.vx,e.vz);
   }
 }
@@ -174,6 +196,7 @@ function snapshot(){
     list[i]={
       id:e.id,x:e.x,y:e.y,z:e.z,yaw:e.yaw,mode:e.mode,vx:e.vx,vz:e.vz,
       species:e.species,
+      energy:e.energy,maxEnergy:maxEnergy(e.genes.size),
       genes:{
         size:e.genes.size,speed:e.genes.speed,climb:e.genes.climb,swim:e.genes.swim,
         thermo:e.genes.thermo,social:e.genes.social,diet:e.genes.diet
