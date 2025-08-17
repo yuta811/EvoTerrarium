@@ -11,10 +11,9 @@ const RES_GRAD_BASE = 0.9;              // base acceleration from resource gradi
 const RES_GRAD_LOW_RES_BOOST = 1.5;     // extra boost when resources are scarce
 const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
 const BASAL_COMFORT_FACTOR = 0.5;
-const HERBIVORE_INTAKE_COEF = 0.25;     // plant energy intake multiplier for herbivores
+const HERBIVORE_INTAKE_COEF = 0.35;     // plant energy intake multiplier for herbivores
 const HERBIVORE_COST_MULT = 0.5;        // scales movement and basal costs for herbivores
 const CARNIVORE_COST_MULT = 1.0;        // scales movement and basal costs for carnivores
-const CARNIVORE_KILL_GAIN = 0.6;        // energy gained by carnivores per successful kill
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 function maxEnergy(size){ return 1.0 + size * 2.0; }
@@ -186,7 +185,7 @@ function tick(dt){
     }else{
       e.energy-=(moveCost+basal);
     }
-    if(inWater)e.hydration=Math.max(e.hydration,Math.min(1.0,e.hydration+0.5*dt)); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=CARNIVORE_KILL_GAIN;o.energy-=1.0;}}}
+    if(inWater)e.hydration=Math.max(e.hydration,Math.min(1.0,e.hydration+0.5*dt)); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
     e.energy=Math.min(e.energy, maxEnergy(e.genes.size));
     if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxEnergy(e.genes.size)*0.75&&e.hydration>0.3){
       const reproCost=Math.max(1.0,maxEnergy(e.genes.size)*0.5);
