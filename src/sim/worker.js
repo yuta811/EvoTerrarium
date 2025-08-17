@@ -13,7 +13,6 @@ const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
 const BASAL_COMFORT_FACTOR = 0.5;
 const HERBIVORE_INTAKE_COEF = 0.35;     // plant energy intake multiplier for herbivores
 const HERBIVORE_COST_MULT = 0.5;        // scales movement and basal costs for herbivores
-const CARNIVORE_COST_MULT = 1.0;        // scales movement and basal costs for carnivores
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 function maxEnergy(size){ return 1.0 + size * 2.0; }
@@ -171,7 +170,7 @@ function tick(dt){
     e.x+=e.vx*dt; e.z+=e.vz*dt; const B=world.bounds-1.0; if(e.x<-B){e.x=-B;e.vx*=-0.8;} if(e.x>B){e.x=B;e.vx*=-0.8;} if(e.z<-B){e.z=-B;e.vz*=-0.8;} if(e.z>B){e.z=B;e.vz*=-0.8;}
     const gY=heightAtWorld(e.x,e.z); e.y=gY+(inWater?(map.waterLevel*VERT-gY):0)+(inWater?0.15:0.35)*CREATURE_SCALE; if(avoidSlope>0.6){e.vx-=Math.sign(e.vx)*0.02; e.vz-=Math.sign(e.vz)*0.02;}
     const biome=b; const biomeMul=(biome===2?0.6:(biome===3?1.3:(biome===4?0.7:1.0)));
-    const dietCostMult=e.genes.diet===0 ? HERBIVORE_COST_MULT : CARNIVORE_COST_MULT;
+    const dietCostMult=(e.genes.diet===0)?HERBIVORE_COST_MULT:1.0;
     let intake=(e.genes.diet===0)?(HERBIVORE_INTAKE_COEF*plantRichnessAt(e.x,e.z)*biomeMul):0;
     const moveCost=(0.005+0.0015*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0))*dietCostMult;
     const basal=(0.002+0.0015*e.genes.size+(e.genes.diet===1?0.0015:0))*comfortCoef*dietCostMult;
