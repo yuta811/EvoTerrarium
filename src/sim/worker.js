@@ -172,8 +172,8 @@ function tick(dt){
     const biome=b; const biomeMul=(biome===2?0.6:(biome===3?1.3:(biome===4?0.7:1.0)));
     const dietCostMult=(e.genes.diet===0)?HERBIVORE_COST_MULT:1.0;
     let intake=(e.genes.diet===0)?(HERBIVORE_INTAKE_COEF*plantRichnessAt(e.x,e.z)*biomeMul):0;
-    const moveCost=(0.002+0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0))*dietCostMult;
-    const basal=(0.0008+0.0006*e.genes.size+(e.genes.diet===1?0.0006:0))*comfortCoef*dietCostMult;
+    const moveCost=(0.005+0.0015*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0))*dietCostMult;
+    const basal=(0.002+0.0015*e.genes.size+(e.genes.diet===1?0.0015:0))*comfortCoef*dietCostMult;
     if(e.genes.diet===0){
       const {i}=mapCoord(e.x,e.z);
       const available=map.resources[i];
