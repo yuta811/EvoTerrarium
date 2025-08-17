@@ -186,7 +186,13 @@ function tick(dt){
     }
     if(inWater)e.hydration=Math.max(e.hydration,Math.min(1.0,e.hydration+0.5*dt)); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
     e.energy=Math.min(e.energy, maxEnergy(e.genes.size));
-    if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxEnergy(e.genes.size)*0.75&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
+    if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxEnergy(e.genes.size)*0.75&&e.hydration>0.3){
+      const reproCost=Math.max(1.0,maxEnergy(e.genes.size)*0.5);
+      e.cooldown=8+rand()*8;
+      e.energy-=reproCost;
+      reproduce(e);
+    }
+    if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
     e.yaw=Math.atan2(e.vx,e.vz);
   }
 }
