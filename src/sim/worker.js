@@ -16,7 +16,6 @@ function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){retu
 // Map
 const VERT=8.0; let map={size:96,heights:new Float32Array(96*96),biomes:new Uint8Array(96*96),resources:new Float32Array(96*96),resMax:new Float32Array(96*96),resRegen:new Float32Array(96*96),smooth:0.3,waterLevel:-0.18};
 function noise2d(x,y,seed){function h(n){const s=Math.sin(n*0.0007+seed*1e-6)*43758.5453;return s-Math.floor(s);}const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;function f(t){return t*t*(3-2*t);}const tl=h(xi*157+yi*311),tr=h((xi+1)*157+yi*311),bl=h(xi*157+(yi+1)*311),br=h((xi+1)*157+(yi+1)*311);const u=f(xf),v=f(yf);return lerp(lerp(tl,tr,u),lerp(bl,br,u),v);} function ridged(x,y,seed){const n=noise2d(x,y,seed);return 1-Math.abs(n*2-1);} function fbm2d(x,y,seed){let sum=0,amp=1,freq=1,total=0;for(let o=0;o<4;o++){sum+=amp*(noise2d(x*freq,y*freq,seed+o*1013)-0.5)*2;total+=amp;amp*=0.5;freq*=2;}return sum/total;}
-function thermalErosion(heights,N,iterations,strength,talus){const tmp=new Float32Array(N*N);for(let it=0;it<iterations;it++){tmp.fill(0);for(let z=0;z<N;z++){for(let x=0;x<N;x++){const i=z*N+x,h=heights[i];if(x>0){const j=i-1,dh=h-heights[j];if(dh>talus){const amt=(dh-talus)*strength;tmp[i]-=amt;tmp[j]+=amt;}}if(x<N-1){const j=i+1,dh=h-heights[j];if(dh>talus){const amt=(dh-talus)*strength;tmp[i]-=amt;tmp[j]+=amt;}}if(z>0){const j=i-N,dh=h-heights[j];if(dh>talus){const amt=(dh-talus)*strength;tmp[i]-=amt;tmp[j]+=amt;}}if(z<N-1){const j=i+N,dh=h-heights[j];if(dh>talus){const amt=(dh-talus)*strength;tmp[i]-=amt;tmp[j]+=amt;}}}}for(let k=0;k<heights.length;k++)heights[k]+=tmp[k];}}
 function generateMap(p){const N=p.size||96;map.size=N;map.heights=new Float32Array(N*N);map.biomes=new Uint8Array(N*N);map.resources=new Float32Array(N*N);map.resMax=new Float32Array(N*N);map.resRegen=new Float32Array(N*N);map.smooth=(p.smooth!==undefined?p.smooth:(p.step||0));
   resourceScale=world.resourceScale||resourceScale;
   const seed=(p.seed||12345)>>>0,slope=p.slope||1.1,mount=p.mount||1.0, rivers=!!p.rivers, set=p.biomes||['plains','forest','desert','wetland','tundra'];
@@ -49,9 +48,7 @@ function generateMap(p){const N=p.size||96;map.size=N;map.heights=new Float32Arr
     map.heights=sm;
   }
   let mn=1e9,mx=-1e9;for(let i=0;i<N*N;i++){const v=map.heights[i];if(v<mn)mn=v;if(v>mx)mx=v;}const rg=mx-mn||1;for(let i=0;i<N*N;i++){map.heights[i]=((map.heights[i]-mn)/rg)*1.2-0.6;}
-  const er=p.erosion||{};const eIter=er.iterations||0;const ePostIter=(er.postIterations!==undefined)?er.postIterations:eIter;const eStr=(er.strength!==undefined)?er.strength:0.25;const eTalus=(er.talus!==undefined)?er.talus:0.01;if(eIter>0)thermalErosion(map.heights,N,eIter,eStr,eTalus);
   if(rivers){for(let z=0;z<N;z++){for(let x=0;x<N;x++){const r=ridged(x*0.05,z*0.05,seed+9909);const d=(1-r);const dig=Math.max(0,d-0.6)*0.55;const i=z*N+x;map.heights[i]-=dig;}}}
-  if(ePostIter>0)thermalErosion(map.heights,N,ePostIter,eStr,eTalus);
   function ok(n){return set.indexOf(n)>=0;}
   for(let z=0;z<N;z++){
     for(let x=0;x<N;x++){
@@ -112,7 +109,7 @@ function waterNear(x,z){return heightRawAt(x,z)<map.waterLevel?1.0:0.0;}
 // spatial hash
 const cell=3.0;let grid=new Map();function gkey(ix,iz){return (ix<<16)|(iz&0xffff);} function rebuild(){grid.clear();for(const e of entities){const ix=Math.floor((e.x+world.bounds)/cell),iz=Math.floor((e.z+world.bounds)/cell),k=gkey(ix,iz);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(e);}} function near(x,z,r){const ix0=Math.floor((x+world.bounds)/cell),iz0=Math.floor((z+world.bounds)/cell),sp=Math.ceil(r/cell);const out=[];for(let dz=-sp;dz<=sp;dz++){for(let dx=-sp;dx<=sp;dx++){const k=gkey(ix0+dx,iz0+dz),arr=grid.get(k);if(!arr)continue;for(const e of arr){const dx2=e.x-x,dz2=e.z-z;if(dx2*dx2+dz2*dz2<=r*r)out.push(e);}}}return out;}
 // lifecycle
-function init(seed,count,cap){randState=seed>>>0;entities=[];devices=[];nextId=1;nextSpeciesId=1;treeNodes=[];world.simCap=cap||world.simCap;generateMap({seed,size:96,smooth:0.3,slope:1.1,mount:1.0,rivers:true,erosion:{iterations:5,strength:0.25,postIterations:3},biomes:['plains','forest','desert','wetland','tundra']});for(let i=0;i<count;i++)entities.push(spawnEntity(nextId++));snapshot();}
+function init(seed,count,cap){randState=seed>>>0;entities=[];devices=[];nextId=1;nextSpeciesId=1;treeNodes=[];world.simCap=cap||world.simCap;generateMap({seed,size:96,smooth:0.3,slope:1.1,mount:1.0,rivers:true,biomes:['plains','forest','desert','wetland','tundra']});for(let i=0;i<count;i++)entities.push(spawnEntity(nextId++));snapshot();}
 function tick(dt){
   const tiles=map.size*map.size;
   for(let i=0;i<tiles;i++){
@@ -190,7 +187,7 @@ let timer=null; onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload;
   else if(t==='seasonSpeed'){world.seasonSpeed=p||1.0;}
   else if(t==='placeDevice'){devices.push({type:p.type,x:p.x,z:p.z,power:1.0,radius:5.0});}
   else if(t==='pickSelect'){let best=null,bd2=1e9;for(const ent of entities){const dx=ent.x-p.x,dz=ent.z-p.z,d2=dx*dx+dz*dz;if(d2<bd2){bd2=d2;best=ent;}} if(best)postMessage({type:'selected',payload:{x:best.x,z:best.z}});}
-  else if(t==='regenMap'){generateMap(p||{seed:Date.now(),size:96,smooth:0.3,slope:1.1,mount:1.0,rivers:true,erosion:{iterations:5,strength:0.25,postIterations:3}});}
+  else if(t==='regenMap'){generateMap(p||{seed:Date.now(),size:96,smooth:0.3,slope:1.1,mount:1.0,rivers:true});}
   else if(t==='getTree'){postMessage({type:'tree',payload:{nodes:treeNodes}});}
   else if(t==='selectSpecies'){postMessage({type:'rpgReady',payload:{species:p.species}});}
   else if(t==='resourceScale'){const newValue = (p !== undefined) ? p : 1.0;const factor=newValue/resourceScale;for(let i=0;i<map.resources.length;i++){map.resources[i]*=factor;map.resMax[i]*=factor;map.resRegen[i]*=factor;}resourceScale=newValue;world.resourceScale=newValue;snapshot();}
