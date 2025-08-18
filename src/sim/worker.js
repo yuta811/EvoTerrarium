@@ -14,6 +14,7 @@ const BASAL_COMFORT_FACTOR = 0.5;
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 function maxEnergy(size){ return 1.0 + size * 2.0; }
+function norm(v,max){return clamp01(v/(max||1));}
 // Map
 const VERT=8.0; let map={size:96,heights:new Float32Array(96*96),biomes:new Uint8Array(96*96),resources:new Float32Array(96*96),resMax:new Float32Array(96*96),resRegen:new Float32Array(96*96),smooth:0.3,waterLevel:-0.18};
 function noise2d(x,y,seed){function h(n){const s=Math.sin(n*0.0007+seed*1e-6)*43758.5453;return s-Math.floor(s);}const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;function f(t){return t*t*(3-2*t);}const tl=h(xi*157+yi*311),tr=h((xi+1)*157+yi*311),bl=h(xi*157+(yi+1)*311),br=h((xi+1)*157+(yi+1)*311);const u=f(xf),v=f(yf);return lerp(lerp(tl,tr,u),lerp(bl,br,u),v);} function ridged(x,y,seed){const n=noise2d(x,y,seed);return 1-Math.abs(n*2-1);} function fbm2d(x,y,seed){let sum=0,amp=1,freq=1,total=0;for(let o=0;o<4;o++){sum+=amp*(noise2d(x*freq,y*freq,seed+o*1013)-0.5)*2;total+=amp;amp*=0.5;freq*=2;}return sum/total;}
@@ -168,18 +169,22 @@ function tick(dt){
     map.resources[i]=Math.min(max,cur+max*map.resRegen[i]*dt);
   }
   world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
-  for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.005*dt*(1+(e.genes.diet===1?0.4:0));const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
+    for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.005*dt*(1+(e.genes.diet===1?0.4:0));const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
+    const maxE=maxEnergy(e.genes.size);
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
     const comfortCoef = 1 + (1 - comfort) * BASAL_COMFORT_FACTOR;
-    const hunger=1-Math.max(0,Math.min(1,e.energy)),thirst=1-Math.max(0,Math.min(1,e.hydration));
+    const energy01=norm(e.energy,maxE),hydration01=norm(e.hydration,1.0);
+    const hunger=1-energy01,thirst=1-hydration01;
     const localRes=map.resources[mapCoord(e.x,e.z).i];
       const energyDeficit=hunger;
-      let U_forage=(e.genes.diet===0?0.6:0.25)*(food+0.2*comfort)+0.2*hunger;
+      let U_forage=(e.genes.diet===0?0.6:0.25)*(food+0.2*comfort);
       U_forage*=1+FORAGE_NEAR_RES_COEF*(1-localRes);
       U_forage*=1+FORAGE_ENERGY_DEFICIT_COEF*energyDeficit;
-      let U_drink=Math.max(0,thirst*0.8+(atWater?0.5:0));
+      U_forage*=hunger;
+      let U_drink=(atWater?0.5:0)+thirst*0.8;
+      U_drink*=thirst;
       let U_mate=(e.energy>1.2&&e.cooldown<=0)?(0.3+e.genes.social*0.4):0.0;
-      let U_rest=(e.energy<0.3?0.6:0.1)*(1-comfort);
+      let U_rest=(energy01<0.3?0.6:0.1)*(1-comfort);
       let fleeX=0,fleeZ=0,chaseX=0,chaseZ=0,prey=0;
       for(const o of ar){
         if(o===e)continue;
@@ -251,22 +256,23 @@ function tick(dt){
     e.x+=e.vx*dt; e.z+=e.vz*dt; const B=world.bounds-1.0; if(e.x<-B){e.x=-B;e.vx*=-0.8;} if(e.x>B){e.x=B;e.vx*=-0.8;} if(e.z<-B){e.z=-B;e.vz*=-0.8;} if(e.z>B){e.z=B;e.vz*=-0.8;}
     const gY=heightAtWorld(e.x,e.z); e.y=gY+(inWater?(map.waterLevel*VERT-gY):0)+(inWater?0.15:0.35)*CREATURE_SCALE; if(avoidSlope>0.6){e.vx-=Math.sign(e.vx)*0.02; e.vz-=Math.sign(e.vz)*0.02;}
     const biome=b; const biomeMul=(biome===2?0.6:(biome===3?1.3:(biome===4?0.7:1.0)));
-    let intake=(e.genes.diet===0)?(0.7*plantRichnessAt(e.x,e.z)*biomeMul):0;
-    const moveCost=(0.002+0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0));
-    const basal=(0.0008+0.0006*e.genes.size+(e.genes.diet===1?0.0006:0))*comfortCoef;
-    if(e.genes.diet===0){
-      const {i}=mapCoord(e.x,e.z);
-      const available=map.resources[i];
-      const maxConsume=intake*dt;
-      const consumed=Math.min(available,maxConsume);
-      map.resources[i]=available-consumed;
-      e.energy+=consumed-(moveCost+basal);
-    }else{
-      e.energy-=(moveCost+basal);
-    }
-    if(inWater)e.hydration=Math.max(e.hydration,Math.min(1.0,e.hydration+0.5*dt)); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
-    e.energy=Math.min(e.energy, maxEnergy(e.genes.size));
-    if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxEnergy(e.genes.size)*0.75&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<-0.2||e.age>300){entities.splice(i,1);continue;}
+      let intake=(e.genes.diet===0)?(0.7*plantRichnessAt(e.x,e.z)*biomeMul):0;
+      const moveCost=(0.002+0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0));
+      const basal=(0.0008+0.0006*e.genes.size+(e.genes.diet===1?0.0006:0))*comfortCoef;
+      if(e.genes.diet===0){
+        const {i}=mapCoord(e.x,e.z);
+        const available=map.resources[i];
+        const maxConsume=intake*dt;
+        const consumed=Math.min(available,maxConsume);
+        map.resources[i]=available-consumed;
+        e.energy+=consumed-(moveCost+basal);
+      }else{
+        e.energy-=(moveCost+basal);
+      }
+      if(inWater)e.hydration=clamp01(e.hydration+0.5*dt); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
+      e.hydration=clamp01(e.hydration);
+      e.energy=maxE*norm(e.energy,maxE);
+      if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxE*0.75&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<=0||e.age>300){entities.splice(i,1);continue;}
     e.yaw=Math.atan2(e.vx,e.vz);
   }
 }
