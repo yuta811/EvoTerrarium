@@ -339,7 +339,7 @@ function loop(){
 }
 
 onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload;
-  if(t==='init'){init((p&&p.seed)||1,(p&&p.entityCount)||200,p&&p.simCap||4000);running=true;accumulator=0;lastTime=performance.now();loop();}
+  if(t==='init'){init((p&&p.seed)||1,(p&&p.entityCount)||400,p&&p.simCap||4000);running=true;accumulator=0;lastTime=performance.now();loop();}
   else if(t==='seasonSpeed'){world.seasonSpeed=p||1.0;}
   else if(t==='placeDevice'){devices.push({type:p.type,x:p.x,z:p.z,power:1.0,radius:5.0});}
   else if(t==='pickSelect'){let best=null,bd2=1e9;for(const ent of entities){const dx=ent.x-p.x,dz=ent.z-p.z,d2=dx*dx+dz*dz;if(d2<bd2){bd2=d2;best=ent;}} if(best)postMessage({type:'selected',payload:{x:best.x,z:best.z}});}
