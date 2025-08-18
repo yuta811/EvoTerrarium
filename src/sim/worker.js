@@ -186,13 +186,8 @@ function tick(dt){
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
     const comfortCoef = 1 + (1 - comfort) * BASAL_COMFORT_FACTOR;
     const energy01=norm(e.energy,maxE),hydration01=norm(e.hydration,1.0);
-    const hunger=1-energy01,thirst=1-hydration01;
-    const localRes=map.resources[mapCoord(e.x,e.z).i];
-      const energyDeficit=hunger;
-      let U_forage=(e.genes.diet===0?0.6:0.25)*(food+0.2*comfort);
-      U_forage*=1+FORAGE_NEAR_RES_COEF*(1-localRes);
-      U_forage*=1+FORAGE_ENERGY_DEFICIT_COEF*energyDeficit;
-      U_forage*=hunger;
+      const hunger=1-energy01,thirst=1-hydration01;
+      const localRes=map.resources[mapCoord(e.x,e.z).i];
       let U_drink=(atWater?0.5:0)+thirst*0.8;
       U_drink*=thirst;
       let U_mate=(e.energy>1.2&&e.cooldown<=0&&e.age>=60)?(0.3+e.genes.social*0.4):0.0;
@@ -204,7 +199,16 @@ function tick(dt){
         if(e.genes.diet===0&&o.genes.diet===1&&d<s){U_rest=0;U_mate=0;fleeX-=dx/d*(1.5-d/s);fleeZ-=dz/d*(1.5-d/s);} 
         if(e.genes.diet===1&&o.genes.diet===0&&d<s){chaseX+=dx/d*(1.5-d/s);chaseZ+=dz/d*(1.5-d/s);prey++;}
       }
-      if(prey>0)U_forage=Math.max(U_forage,0.25);
+      let U_forage;
+      if (e.genes.diet === 0) {
+        U_forage = 0.6 * (food + 0.2 * comfort);
+        U_forage *= 1 + FORAGE_NEAR_RES_COEF * (1 - localRes);
+      } else {
+        const chaseMag = Math.sqrt(chaseX * chaseX + chaseZ * chaseZ);
+        U_forage = 0.25 * (0.2 + 0.8 * Math.min(1, chaseMag));
+      }
+      U_forage *= 1 + FORAGE_ENERGY_DEFICIT_COEF * hunger;
+      U_forage *= hunger;
       const U_escape=Math.sqrt(fleeX*fleeX+fleeZ*fleeZ);
       const U_explore=0.1;
       const bw=e.genes.behavior||{};
@@ -228,12 +232,12 @@ function tick(dt){
       if(ncoh>0){cohX=(cohX/ncoh-e.x);cohZ=(cohZ/ncoh-e.z);}
       const baseX=sepX*1.6+aliX*0.12*e.genes.social+cohX*0.08*e.genes.social;
       const baseZ=sepZ*1.6+aliZ*0.12*e.genes.social+cohZ*0.08*e.genes.social;
-      const resR=map.resources[mapCoord(e.x+0.8,e.z).i],resL=map.resources[mapCoord(e.x-0.8,e.z).i];
-      const resU=map.resources[mapCoord(e.x,e.z+0.8).i],resD=map.resources[mapCoord(e.x,e.z-0.8).i];
-      const gx=resR-resL,gz=resU-resD;
       const hR=heightRawAt(e.x+0.6,e.z)-heightRawAt(e.x-0.6,e.z), hU=heightRawAt(e.x,e.z+0.6)-heightRawAt(e.x,e.z-0.6);
       let forageX=0,forageZ=0;
       if(e.genes.diet===0){
+        const resR=map.resources[mapCoord(e.x+0.8,e.z).i],resL=map.resources[mapCoord(e.x-0.8,e.z).i];
+        const resU=map.resources[mapCoord(e.x,e.z+0.8).i],resD=map.resources[mapCoord(e.x,e.z-0.8).i];
+        const gx=resR-resL,gz=resU-resD;
         const need=Math.max(0,RES_LOW_THRESHOLD-localRes)/RES_LOW_THRESHOLD;
         const gradCoef=RES_GRAD_BASE*(1+need*RES_GRAD_LOW_RES_BOOST);
         forageX=gx*gradCoef; forageZ=gz*gradCoef;
