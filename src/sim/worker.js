@@ -254,6 +254,8 @@ function tick(dt){
       if(ncoh>0){cohX=(cohX/ncoh-e.x);cohZ=(cohZ/ncoh-e.z);}
       const baseX=sepX*1.6+aliX*0.12*e.genes.social+cohX*0.08*e.genes.social;
       const baseZ=sepZ*1.6+aliZ*0.12*e.genes.social+cohZ*0.08*e.genes.social;
+      const gLen=Math.hypot(baseX,baseZ);
+      const groupDir=gLen>0?{x:baseX/gLen,z:baseZ/gLen}:{x:0,z:0};
       const hR=heightRawAt(e.x+0.6,e.z)-heightRawAt(e.x-0.6,e.z), hU=heightRawAt(e.x,e.z+0.6)-heightRawAt(e.x,e.z-0.6);
       let forageX=0,forageZ=0;
       if(e.genes.diet===0){
@@ -272,11 +274,12 @@ function tick(dt){
       const restX=0, restZ=0;
       let exploreX, exploreZ;
       if (e.searchDir) {
-        exploreX = e.searchDir.x * 0.3 + (rand()*2-1)*0.05;
-        exploreZ = e.searchDir.z * 0.3 + (rand()*2-1)*0.05;
+        exploreX=0.3*e.searchDir.x+0.2*groupDir.x*e.genes.social;
+        exploreZ=0.3*e.searchDir.z+0.2*groupDir.z*e.genes.social;
       } else {
-        exploreX = (rand()*2-1)*0.3;
-        exploreZ = (rand()*2-1)*0.3;
+        const ang=rand()*Math.PI*2;
+        exploreX=Math.cos(ang)*0.3+0.2*groupDir.x*e.genes.social;
+        exploreZ=Math.sin(ang)*0.3+0.2*groupDir.z*e.genes.social;
       }
       const vecs={
         forage:{x:forageX,z:forageZ},
