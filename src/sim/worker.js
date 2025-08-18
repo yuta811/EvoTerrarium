@@ -210,12 +210,18 @@ function tick(dt){
       } else {
         const chaseMag = Math.sqrt(chaseX * chaseX + chaseZ * chaseZ);
         U_forage = 0.25 * (0.2 + 0.8 * Math.min(1, chaseMag));
+        if (prey === 0) {
+          U_forage = 0;
+        }
       }
       U_forage *= 1 + FORAGE_ENERGY_DEFICIT_COEF * hunger;
       U_forage *= hunger;
       const U_escape=Math.sqrt(fleeX*fleeX+fleeZ*fleeZ);
       const deficit=Math.max(hunger,thirst,discomfort);
-      const U_explore=0.1+0.9*clamp01((deficit-EXPLORE_DEFICIT_THRESHOLD)/(1-EXPLORE_DEFICIT_THRESHOLD));
+      let U_explore=0.1+0.9*clamp01((deficit-EXPLORE_DEFICIT_THRESHOLD)/(1-EXPLORE_DEFICIT_THRESHOLD));
+      if (prey === 0 && e.genes.diet === 1) {
+        U_explore += hunger * 0.3;
+      }
       const bw=e.genes.behavior||{};
       const u={forage:U_forage,drink:U_drink,mate:U_mate,rest:U_rest,escape:U_escape,explore:U_explore};
       let behavior='explore',maxDes=-1;
