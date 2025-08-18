@@ -11,6 +11,7 @@ const RES_GRAD_BASE = 0.9;              // base acceleration from resource gradi
 const RES_GRAD_LOW_RES_BOOST = 1.5;     // extra boost when resources are scarce
 const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
 const BASAL_COMFORT_FACTOR = 0.5;
+const DEHYDRATION_PENALTY = 0.02;
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 function maxEnergy(size){ return 1.0 + size * 2.0; }
@@ -277,6 +278,7 @@ function tick(dt){
       }
       if(inWater)e.hydration=clamp01(e.hydration+0.5*dt); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
       e.hydration=clamp01(e.hydration);
+      if (e.hydration <= 0) e.energy -= DEHYDRATION_PENALTY * dt;
       e.energy=maxE*norm(e.energy,maxE);
       if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxE*0.75&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<=0||e.age>300){entities.splice(i,1);continue;}
     e.yaw=Math.atan2(e.vx,e.vz);
