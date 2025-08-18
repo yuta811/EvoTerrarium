@@ -8,11 +8,12 @@
       const x=this.target.x+rad*Math.sin(sp)*Math.sin(theta),y=this.target.y+rad*Math.cos(sp),z=this.target.z+rad*Math.sin(sp)*Math.cos(theta);
       this.object.position.set(x,y,z);this.object.lookAt(this.target);};upd();
     dom.addEventListener('pointerdown',e=>{st=(e.ctrlKey||e.metaKey||e.button===1)?'pan':'orbit';sx=e.clientX;sy=e.clientY;dom.setPointerCapture?.(e.pointerId);});
-    dom.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=e.clientX;sy=e.clientY;if(st==='orbit'){theta-=dx*0.005;phi-=dy*0.005;}else{const s=rad*0.0015;const right=new THREE.Vector3().subVectors(this.object.position,this.target).cross(this.object.up).normalize();const up=new THREE.Vector3().copy(this.object.up);this.target.addScaledVector(right,-dx*s);this.target.addScaledVector(up,dy*s);}upd();});
+    dom.addEventListener('pointermove',e=>{if(!st||st==='pinch')return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=e.clientX;sy=e.clientY;if(st==='orbit'){theta-=dx*0.005;phi-=dy*0.005;}else{const s=rad*0.0015;const right=new THREE.Vector3().subVectors(this.object.position,this.target).cross(this.object.up).normalize();const up=new THREE.Vector3().copy(this.object.up);this.target.addScaledVector(right,-dx*s);this.target.addScaledVector(up,dy*s);}upd();});
     dom.addEventListener('pointerup',e=>{st=null;dom.releasePointerCapture?.(e.pointerId);});
     dom.addEventListener('wheel',e=>{rad*=(1+Math.sign(e.deltaY)*0.1);upd();},{passive:true});
     let last=0;dom.addEventListener('touchstart',e=>{if(e.touches.length===2){st='pinch';last=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}},{passive:true});
-    dom.addEventListener('touchmove',e=>{if(st==='pinch'&&e.touches.length===2){const nd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const dd=nd-last;last=nd;rad*=(1-dd*0.002);upd();}},{passive:true});this.update=function(){};}
+    dom.addEventListener('touchmove',e=>{if(st==='pinch'&&e.touches.length===2){const nd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const dd=nd-last;last=nd;rad*=(1-dd*0.002);upd();}},{passive:true});
+    dom.addEventListener('touchend',e=>{if(st==='pinch'&&e.touches.length<2)st=null;},{passive:true});this.update=function(){};}
   function Engine3D(container){if(!THREE)throw new Error('THREE not loaded');this.container=container;
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));this.renderer.setSize(window.innerWidth,window.innerHeight);container.appendChild(this.renderer.domElement);
