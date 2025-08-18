@@ -85,7 +85,7 @@ function gdist(a,b){
   let d = Math.abs(a.size-b.size)*0.8+Math.abs(a.speed-b.speed)*0.6+
           Math.abs(a.thermo-b.thermo)*0.8+Math.abs(a.climb-b.climb)*0.6+
           Math.abs(a.swim-b.swim)*0.6+Math.abs(a.social-b.social)*0.4+
-          (a.diet!==b.diet?0.4:0);
+          Math.abs(a.perception-b.perception)*0.4+(a.diet!==b.diet?0.4:0);
   const ba=a.behavior||{}, bb=b.behavior||{};
   const keys=['forage','drink','mate','rest','escape','explore'];
   for(const k of keys){
@@ -111,6 +111,7 @@ function newGenes(base){
     climb:clamp01((base&&base.climb||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
     swim:clamp01((base&&base.swim||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
     social:clamp01((base&&base.social||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
+    perception:clamp01((base&&base.perception||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
     diet:(base&&base.diet!==undefined)?base.diet:(rand()<0.15?1:0),
     drift:(base&&base.drift||0)+rand()*DRIFT_STEP,
     behavior
@@ -181,7 +182,7 @@ function tick(dt){
     map.resources[i]=Math.min(max,cur+max*map.resRegen[i]*dt);
   }
   world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
-    for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.01*dt;e.hydration=Math.max(0,e.hydration);const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
+    for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.01*dt;e.hydration=Math.max(0,e.hydration);const s=3.0+e.genes.perception*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
     const maxE=maxEnergy(e.genes.size);
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
     const comfortCoef = 1 + (1 - comfort) * BASAL_COMFORT_FACTOR;
@@ -306,7 +307,7 @@ function snapshot(){
         energy:e.energy,maxEnergy:maxEnergy(e.genes.size),
         genes:{
           size:e.genes.size,speed:e.genes.speed,climb:e.genes.climb,swim:e.genes.swim,
-          thermo:e.genes.thermo,social:e.genes.social,diet:e.genes.diet,
+          thermo:e.genes.thermo,social:e.genes.social,perception:e.genes.perception,diet:e.genes.diet,
           behavior:{
             w_forage:e.genes.behavior.w_forage,w_drink:e.genes.behavior.w_drink,
             w_mate:e.genes.behavior.w_mate,w_rest:e.genes.behavior.w_rest,
