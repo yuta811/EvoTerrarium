@@ -12,6 +12,7 @@ const RES_GRAD_LOW_RES_BOOST = 1.5;     // extra boost when resources are scarce
 const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
 const BASAL_COMFORT_FACTOR = 0.5;
 const DEHYDRATION_PENALTY = 0.02;
+const EXPLORE_DEFICIT_THRESHOLD = 0.6;  // deficit level where exploration urge spikes
 
 let simSpeed = 1;
 let running = true;
@@ -187,7 +188,7 @@ function tick(dt){
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
     const comfortCoef = 1 + (1 - comfort) * BASAL_COMFORT_FACTOR;
     const energy01=norm(e.energy,maxE),hydration01=norm(e.hydration,1.0);
-      const hunger=1-energy01,thirst=1-hydration01;
+      const hunger=1-energy01,thirst=1-hydration01,discomfort=1-comfort;
       const localRes=map.resources[mapCoord(e.x,e.z).i];
       let U_drink=(atWater?0.5:0)+thirst*0.8;
       U_drink*=thirst;
@@ -211,7 +212,8 @@ function tick(dt){
       U_forage *= 1 + FORAGE_ENERGY_DEFICIT_COEF * hunger;
       U_forage *= hunger;
       const U_escape=Math.sqrt(fleeX*fleeX+fleeZ*fleeZ);
-      const U_explore=0.1;
+      const deficit=Math.max(hunger,thirst,discomfort);
+      const U_explore=0.1+0.9*clamp01((deficit-EXPLORE_DEFICIT_THRESHOLD)/(1-EXPLORE_DEFICIT_THRESHOLD));
       const bw=e.genes.behavior||{};
       const u={forage:U_forage,drink:U_drink,mate:U_mate,rest:U_rest,escape:U_escape,explore:U_explore};
       let behavior='explore',maxDes=-1;
