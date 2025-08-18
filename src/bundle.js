@@ -154,7 +154,23 @@
   function showTree(v){treeCanvas.style.display=v?'block':'none';if(v)drawTree();}
   treeCanvas.addEventListener('click',e=>{const s=(window.devicePixelRatio||1),r=treeCanvas.getBoundingClientRect();const x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;for(const n of treeData.nodes){const dx=x-n._x,dy=y-n._y;if(dx*dx+dy*dy<14*14*s){sim&&sim.postMessage({type:'selectSpecies',payload:{species:n.id}});showTree(false);break;}}});
   function applyMap(data){engine.rebuildTerrain(data);}
-  if(sim){sim.onmessage=(e)=>{const t=e.data.type,p=e.data.payload;if(t==='state'){creatures.update(p.entities);engine.updateTerrain(p.world);engine.updateDevices(p.devices||[]);const maxE=p.entities.reduce((m,e)=>Math.max(m,e.maxEnergy||0),0);statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)} • maxE:${maxE.toFixed(2)}`;d('state ok');}else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}};sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:200,simCap:parseInt(document.getElementById('simCap').value,10)}});}
+  if(sim){sim.onmessage=(e)=>{const t=e.data.type,p=e.data.payload;
+    if(t==='state'){
+      creatures.update(p.entities);
+      engine.updateTerrain(p.world);
+      engine.updateDevices(p.devices||[]);
+      const speciesMap={};
+      for(const e of p.entities){const s=e.species,d=e.genes&&e.genes.diet||0;const m=speciesMap[s]||(speciesMap[s]={count:0,diet:d});m.count++;}
+      const carnivores=[],herbivores=[];
+      for(const s in speciesMap){const info=speciesMap[s];const color=creatures._colorFrom({species:parseInt(s,10),genes:{diet:info.diet}}).getStyle();const obj={species:parseInt(s,10),count:info.count,color};(info.diet===1?carnivores:herbivores).push(obj);}
+      carnivores.sort((a,b)=>b.count-a.count);herbivores.sort((a,b)=>b.count-a.count);
+      const bar=document.getElementById('speciesBar');
+      if(bar){bar.innerHTML='';let acc=0,total=p.entities.length||1;for(const sp of carnivores){const seg=document.createElement('div');seg.className='speciesSeg';const pct=sp.count/total*100;seg.style.left=acc+'%';seg.style.width=pct+'%';seg.style.background=sp.color;bar.appendChild(seg);acc+=pct;}acc=0;for(const sp of herbivores){const seg=document.createElement('div');seg.className='speciesSeg';const pct=sp.count/total*100;seg.style.right=acc+'%';seg.style.width=pct+'%';seg.style.background=sp.color;bar.appendChild(seg);acc+=pct;}}
+      const maxE=p.entities.reduce((m,e)=>Math.max(m,e.maxEnergy||0),0);
+      statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)} • maxE:${maxE.toFixed(2)}`;
+      d('state ok');
+    }else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}
+  };sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:200,simCap:parseInt(document.getElementById('simCap').value,10)}});}
   engine.start();
   seasonSpeed.addEventListener('input',function(){sim&&sim.postMessage({type:'seasonSpeed',payload:parseFloat(this.value)})});
   resScale&&resScale.addEventListener('input',function(){const newScale=parseFloat(this.value);sim&&sim.postMessage({type:'resourceScale', payload:newScale});});

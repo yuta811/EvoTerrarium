@@ -10,3 +10,5 @@ html,body{margin:0;padding:0;height:100%;width:100%;background:#0f151d;color:#e6
 #panel #modes button{background:rgba(0,0,0,.35)}
 #panel #modes button.on{background:rgba(120,180,255,.25)}
 #diag{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#speciesBar{position:fixed;top:8px;right:8px;width:240px;height:12px;pointer-events:none}
+.speciesSeg{position:absolute;top:0;bottom:0}
