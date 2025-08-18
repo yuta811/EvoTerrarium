@@ -285,7 +285,7 @@ function tick(dt){
       }else{
         e.energy-=(moveCost+basal);
       }
-      if(inWater)e.hydration=clamp01(e.hydration+0.5*dt); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=0.6;o.energy-=1.0;}}}
+      if(inWater)e.hydration=clamp01(e.hydration+0.5*dt); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.25*0.25){e.energy+=1.0;o.energy-=1.0;}}}
       e.hydration=clamp01(e.hydration);
       if (e.hydration <= 0) e.energy -= DEHYDRATION_PENALTY * dt;
       e.energy=maxE*norm(e.energy,maxE);
