@@ -170,7 +170,7 @@
       statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)} • maxE:${maxE.toFixed(2)}`;
       d('state ok');
     }else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}
-  };sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:200,simCap:parseInt(document.getElementById('simCap').value,10)}});}
+  };sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:400,simCap:parseInt(document.getElementById('simCap').value,10)}});}
   engine.start();
   seasonSpeed.addEventListener('input',function(){sim&&sim.postMessage({type:'seasonSpeed',payload:parseFloat(this.value)})});
   resScale&&resScale.addEventListener('input',function(){const newScale=parseFloat(this.value);sim&&sim.postMessage({type:'resourceScale', payload:newScale});});
