@@ -149,39 +149,11 @@
   const statsEl=document.getElementById('stats');const seasonSpeed=document.getElementById('seasonSpeed');
   const resScale=document.getElementById('resScale');const resScaleReset=document.getElementById('resScaleReset');
   const treeCanvas=document.getElementById('tree');const tctx=treeCanvas.getContext('2d');let treeData={nodes:[]};
-  const infoEl=document.getElementById('creatureInfo');
-  let infoCloser=null;
-  function hideInfo(){
-    if(!infoEl)return;
-    infoEl.style.display='none';
-    if(infoCloser){
-      document.removeEventListener('click',infoCloser);
-      document.removeEventListener('touchstart',infoCloser);
-      infoCloser=null;
-    }
-  }
-  function showInfo(ent){
-    if(!infoEl)return;
-    hideInfo();
-    const g=ent.genes||{};
-    infoEl.innerHTML=`<div><strong>ID:</strong> ${ent.id}</div>
-<div><strong>Energy:</strong> ${ent.energy.toFixed(2)}</div>
-<div><strong>Hydration:</strong> ${ent.hydration.toFixed(2)}</div>
-<div><strong>Age:</strong> ${ent.age.toFixed(2)}</div>
-<div><strong>Species:</strong> ${ent.species}</div>
-<div><strong>Genes:</strong> size ${ (g.size??0).toFixed(2) }, speed ${ (g.speed??0).toFixed(2) }, thermo ${ (g.thermo??0).toFixed(2) }, climb ${ (g.climb??0).toFixed(2) }, swim ${ (g.swim??0).toFixed(2) }, social ${ (g.social??0).toFixed(2) }, diet ${ g.diet }</div>`;
-    infoEl.style.display='block';
-    infoCloser=(ev)=>{if(!infoEl.contains(ev.target))hideInfo();};
-    document.addEventListener('click',infoCloser);
-    document.addEventListener('touchstart',infoCloser);
-  }
-  infoEl&&infoEl.addEventListener('click',e=>e.stopPropagation());
-  infoEl&&infoEl.addEventListener('touchstart',e=>e.stopPropagation());
   function drawTree(){const s=(window.devicePixelRatio||1);treeCanvas.width=window.innerWidth*s;treeCanvas.height=window.innerHeight*s;tctx.setTransform(1,0,0,1,0,0);tctx.clearRect(0,0,treeCanvas.width,treeCanvas.height);tctx.lineWidth=2*s;if(!treeData.nodes.length)return;const maxT=Math.max(...treeData.nodes.map(n=>n.birth));const minT=Math.min(...treeData.nodes.map(n=>n.birth));const G={};treeData.nodes.forEach(n=>{(G[n.parent]||(G[n.parent]=[])).push(n);});function layout(pid,depth,y0){const arr=G[pid]||[];const gap=60*s;let y=y0;for(const n of arr){n._x=(depth+1)*120*s;n._y=y;layout(n.id,depth+1,y);y+=gap;}if(arr.length===0)y=y0+gap;return y;}const root={id:0};root._x=40*s;root._y=40*s;layout(0,0,80*s);tctx.font=`${12*s}px sans-serif`;for(const n of treeData.nodes){const hue=(n.hue||0.35);tctx.fillStyle=`hsl(${Math.floor((hue*360)%360)},70%,60%)`;tctx.beginPath();tctx.arc(n._x,n._y,8*s,0,Math.PI*2);tctx.fill();tctx.fillText(String(n.id),n._x+10*s,n._y-8*s);}for(const n of treeData.nodes){const arr=G[n.parent]||[];for(const ch of arr){tctx.strokeStyle='rgba(255,255,255,0.35)';tctx.beginPath();tctx.moveTo(n._x,n._y);tctx.lineTo(ch._x,ch._y);tctx.stroke();}}}
   function showTree(v){treeCanvas.style.display=v?'block':'none';if(v)drawTree();}
   treeCanvas.addEventListener('click',e=>{const s=(window.devicePixelRatio||1),r=treeCanvas.getBoundingClientRect();const x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;for(const n of treeData.nodes){const dx=x-n._x,dy=y-n._y;if(dx*dx+dy*dy<14*14*s){sim&&sim.postMessage({type:'selectSpecies',payload:{species:n.id}});showTree(false);break;}}});
   function applyMap(data){engine.rebuildTerrain(data);}
-  if(sim){sim.onmessage=(e)=>{const t=e.data.type,p=e.data.payload;if(t==='state'){creatures.update(p.entities);engine.updateTerrain(p.world);engine.updateDevices(p.devices||[]);const maxE=p.entities.reduce((m,e)=>Math.max(m,e.maxEnergy||0),0);statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)} • maxE:${maxE.toFixed(2)}`;d('state ok');}else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);showInfo(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}};sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:200,simCap:parseInt(document.getElementById('simCap').value,10)}});}
+  if(sim){sim.onmessage=(e)=>{const t=e.data.type,p=e.data.payload;if(t==='state'){creatures.update(p.entities);engine.updateTerrain(p.world);engine.updateDevices(p.devices||[]);const maxE=p.entities.reduce((m,e)=>Math.max(m,e.maxEnergy||0),0);statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)} • maxE:${maxE.toFixed(2)}`;d('state ok');}else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}};sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:200,simCap:parseInt(document.getElementById('simCap').value,10)}});}
   engine.start();
   seasonSpeed.addEventListener('input',function(){sim&&sim.postMessage({type:'seasonSpeed',payload:parseFloat(this.value)})});
   resScale&&resScale.addEventListener('input',function(){const newScale=parseFloat(this.value);sim&&sim.postMessage({type:'resourceScale', payload:newScale});});

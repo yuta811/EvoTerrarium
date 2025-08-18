@@ -10,6 +10,3 @@ html,body{margin:0;padding:0;height:100%;width:100%;background:#0f151d;color:#e6
 #panel #modes button{background:rgba(0,0,0,.35)}
 #panel #modes button.on{background:rgba(120,180,255,.25)}
 #diag{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-#creatureInfo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.8);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 14px;display:none;z-index:5;color:#e6eef5;pointer-events:auto}
-#creatureInfo div{margin-bottom:4px}
