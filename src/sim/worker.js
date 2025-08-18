@@ -72,7 +72,27 @@ function biomeAt(x,z){const c=mapCoord(x,z);return map.biomes[c.i]||0;}
 let nextId=1,nextSpeciesId=1;const speciesHues={};let treeNodes=[];
 function regSpecies(id,parent){const hue=(speciesHues[id]!==undefined?speciesHues[id]:rand());treeNodes.push({id,parent:parent||0,birth:world.t,hue});}
 function gdist(a,b){return Math.abs(a.size-b.size)*0.8+Math.abs(a.speed-b.speed)*0.6+Math.abs(a.thermo-b.thermo)*0.8+Math.abs(a.climb-b.climb)*0.6+Math.abs(a.swim-b.swim)*0.6+Math.abs(a.social-b.social)*0.4+(a.diet!==b.diet?0.4:0);}
-function newGenes(base){return {size:clamp01((base&&base.size||0.5)+(rand()*2-1)*0.05),speed:clamp01((base&&base.speed||0.5)+(rand()*2-1)*0.05),thermo:clamp01((base&&base.thermo||rand())+(rand()*2-1)*0.03),climb:clamp01((base&&base.climb||rand())+(rand()*2-1)*0.03),swim:clamp01((base&&base.swim||rand())+(rand()*2-1)*0.03),social:clamp01((base&&base.social||rand())+(rand()*2-1)*0.03),diet:(base&&base.diet!==undefined)?base.diet:(rand()<0.15?1:0)};}
+function newGenes(base){
+  const b=base&&base.behavior;
+  const behavior={
+    forage:clamp01((b&&b.forage||rand())+(rand()*2-1)*0.05),
+    drink:clamp01((b&&b.drink||rand())+(rand()*2-1)*0.05),
+    mate:clamp01((b&&b.mate||rand())+(rand()*2-1)*0.05),
+    rest:clamp01((b&&b.rest||rand())+(rand()*2-1)*0.05),
+    escape:clamp01((b&&b.escape||rand())+(rand()*2-1)*0.05),
+    explore:clamp01((b&&b.explore||rand())+(rand()*2-1)*0.05)
+  };
+  return {
+    size:clamp01((base&&base.size||0.5)+(rand()*2-1)*0.05),
+    speed:clamp01((base&&base.speed||0.5)+(rand()*2-1)*0.05),
+    thermo:clamp01((base&&base.thermo||rand())+(rand()*2-1)*0.03),
+    climb:clamp01((base&&base.climb||rand())+(rand()*2-1)*0.03),
+    swim:clamp01((base&&base.swim||rand())+(rand()*2-1)*0.03),
+    social:clamp01((base&&base.social||rand())+(rand()*2-1)*0.03),
+    diet:(base&&base.diet!==undefined)?base.diet:(rand()<0.15?1:0),
+    behavior
+  };
+}
 function spawnEntity(id){
   const g=newGenes();
   const x=(rand()*2-1)*(world.bounds*0.6),z=(rand()*2-1)*(world.bounds*0.6);
@@ -80,7 +100,7 @@ function spawnEntity(id){
   speciesHues[sp]=rand();
   regSpecies(sp,0);
   const energy=maxEnergy(g.size)*0.6;
-  return {id,x,z,y:heightAtWorld(x,z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,age:0.0,hydration:1.0,cooldown:rand()*6,genes:g,species:sp,mode:'walk',biomeExp:new Uint8Array(5)};
+  return {id,x,z,y:heightAtWorld(x,z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,age:0.0,hydration:1.0,cooldown:rand()*6,genes:g,species:sp,mode:'walk',behavior:'explore',biomeExp:new Uint8Array(5)};
 }
 function reproduce(p){
   const cg=newGenes(p.genes);
@@ -93,7 +113,7 @@ function reproduce(p){
     regSpecies(sp,p.species);
   }
   const energy=maxEnergy(cg.size)*0.6;
-  entities.push({id:nextId++,x:p.x+(rand()*2-1)*0.5,z:p.z+(rand()*2-1)*0.5,y:heightAtWorld(p.x,p.z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,hydration:0.8,age:0.0,cooldown:4+rand()*4,genes:cg,species:sp,mode:'walk',biomeExp:new Uint8Array(5)});
+    entities.push({id:nextId++,x:p.x+(rand()*2-1)*0.5,z:p.z+(rand()*2-1)*0.5,y:heightAtWorld(p.x,p.z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,hydration:0.8,age:0.0,cooldown:4+rand()*4,genes:cg,species:sp,mode:'walk',behavior:'explore',biomeExp:new Uint8Array(5)});
 }
 // env
 function comfortTempBase(z){return (Math.sin(z*0.07)*0.5+0.5);} function comfortTempWithDevices(x,z){let t=comfortTempBase(z);for(const d of devices){if(d.type!=='heater')continue;const dx=d.x-x,dz=d.z-z;const r2=dx*dx+dz*dz;const fall=Math.exp(-r2/(d.radius*d.radius));t=clamp01(t+d.power*0.25*fall);}return t;}
@@ -143,24 +163,74 @@ function tick(dt){
     const comfortCoef = 1 + (1 - comfort) * BASAL_COMFORT_FACTOR;
     const hunger=1-Math.max(0,Math.min(1,e.energy)),thirst=1-Math.max(0,Math.min(1,e.hydration));
     const localRes=map.resources[mapCoord(e.x,e.z).i];
-    const energyDeficit=hunger;
-    let U_forage=(e.genes.diet===0?0.6:0.25)*(food+0.2*comfort)+0.2*hunger;
-    U_forage*=1+FORAGE_NEAR_RES_COEF*(1-localRes);
-    U_forage*=1+FORAGE_ENERGY_DEFICIT_COEF*energyDeficit;
-    let U_drink=Math.max(0,thirst*0.8+(atWater?0.5:0)); let U_mate=(e.energy>1.2&&e.cooldown<=0)?(0.3+e.genes.social*0.4):0.0; let U_rest=(e.energy<0.3?0.6:0.1)*(1-comfort);
-    let fleeX=0,fleeZ=0,chaseX=0,chaseZ=0,prey=0; for(const o of ar){if(o===e)continue;const dx=o.x-e.x,dz=o.z-e.z;const d=Math.sqrt(dx*dx+dz*dz)+1e-6; if(e.genes.diet===0&&o.genes.diet===1&&d<s){U_rest=0;U_mate=0;fleeX-=dx/d*(1.5-d/s);fleeZ-=dz/d*(1.5-d/s);} if(e.genes.diet===1&&o.genes.diet===0&&d<s){chaseX+=dx/d*(1.5-d/s);chaseZ+=dz/d*(1.5-d/s);prey++;}}
-    if(prey>0)U_forage=Math.max(U_forage,0.25);
-    let ax=0,az=0; let sepX=0,sepZ=0,aliX=0,aliZ=0,cohX=0,cohZ=0, nali=0,ncoh=0; for(const o of ar){if(o===e)continue;const dx=e.x-o.x,dz=e.z-o.z;const d=Math.sqrt(dx*dx+dz*dz)+1e-6; if(d<1.0){const f=(1.0-d);sepX+=(dx/d)*f;sepZ+=(dz/d)*f;} if(o.genes.diet===e.genes.diet){aliX+=o.vx;aliZ+=o.vz;nali++;cohX+=o.x;cohZ+=o.z;ncoh++;}} if(nali>0){aliX/=nali;aliZ/=nali;} if(ncoh>0){cohX=(cohX/ncoh-e.x);cohZ=(cohZ/ncoh-e.z);} ax+=sepX*1.6+aliX*0.12*e.genes.social+cohX*0.08*e.genes.social; az+=sepZ*1.6+aliZ*0.12*e.genes.social+cohZ*0.08*e.genes.social;
-    const resR=map.resources[mapCoord(e.x+0.8,e.z).i],resL=map.resources[mapCoord(e.x-0.8,e.z).i];
-    const resU=map.resources[mapCoord(e.x,e.z+0.8).i],resD=map.resources[mapCoord(e.x,e.z-0.8).i];
-    const gx=resR-resL,gz=resU-resD;
-    if(e.genes.diet===0){
-      const need=Math.max(0,RES_LOW_THRESHOLD-localRes)/RES_LOW_THRESHOLD;
-      const gradCoef=RES_GRAD_BASE*(1+need*RES_GRAD_LOW_RES_BOOST);
-      ax+=gx*gradCoef; az+=gz*gradCoef;
-    }
-    if(thirst>0.3){const hR=heightRawAt(e.x+0.6,e.z)-heightRawAt(e.x-0.6,e.z), hU=heightRawAt(e.x,e.z+0.6)-heightRawAt(e.x,e.z-0.6); ax+=-hR*0.9*thirst; az+=-hU*0.9*thirst;}
-    ax+=chaseX*1.2+fleeX*1.7; az+=chaseZ*1.2+fleeZ*1.7;
+      const energyDeficit=hunger;
+      let U_forage=(e.genes.diet===0?0.6:0.25)*(food+0.2*comfort)+0.2*hunger;
+      U_forage*=1+FORAGE_NEAR_RES_COEF*(1-localRes);
+      U_forage*=1+FORAGE_ENERGY_DEFICIT_COEF*energyDeficit;
+      let U_drink=Math.max(0,thirst*0.8+(atWater?0.5:0));
+      let U_mate=(e.energy>1.2&&e.cooldown<=0)?(0.3+e.genes.social*0.4):0.0;
+      let U_rest=(e.energy<0.3?0.6:0.1)*(1-comfort);
+      let fleeX=0,fleeZ=0,chaseX=0,chaseZ=0,prey=0;
+      for(const o of ar){
+        if(o===e)continue;
+        const dx=o.x-e.x,dz=o.z-e.z;const d=Math.sqrt(dx*dx+dz*dz)+1e-6;
+        if(e.genes.diet===0&&o.genes.diet===1&&d<s){U_rest=0;U_mate=0;fleeX-=dx/d*(1.5-d/s);fleeZ-=dz/d*(1.5-d/s);} 
+        if(e.genes.diet===1&&o.genes.diet===0&&d<s){chaseX+=dx/d*(1.5-d/s);chaseZ+=dz/d*(1.5-d/s);prey++;}
+      }
+      if(prey>0)U_forage=Math.max(U_forage,0.25);
+      const U_escape=Math.sqrt(fleeX*fleeX+fleeZ*fleeZ);
+      const U_explore=0.1;
+      const bw=e.genes.behavior||{};
+      const desires={
+        forage:U_forage*(bw.forage??1),
+        drink:U_drink*(bw.drink??1),
+        mate:U_mate*(bw.mate??1),
+        rest:U_rest*(bw.rest??1),
+        escape:U_escape*(bw.escape??1),
+        explore:U_explore*(bw.explore??1)
+      };
+      let behavior='explore',maxDes=-1;
+      for(const k in desires){const v=desires[k];if(v>maxDes){maxDes=v;behavior=k;}}
+      e.behavior=behavior;
+      let ax=0,az=0;
+      let sepX=0,sepZ=0,aliX=0,aliZ=0,cohX=0,cohZ=0,nali=0,ncoh=0;
+      for(const o of ar){
+        if(o===e)continue;
+        const dx=e.x-o.x,dz=e.z-o.z;const d=Math.sqrt(dx*dx+dz*dz)+1e-6;
+        if(d<1.0){const f=(1.0-d);sepX+=(dx/d)*f;sepZ+=(dz/d)*f;}
+        if(o.genes.diet===e.genes.diet){aliX+=o.vx;aliZ+=o.vz;nali++;cohX+=o.x;cohZ+=o.z;ncoh++;}
+      }
+      if(nali>0){aliX/=nali;aliZ/=nali;}
+      if(ncoh>0){cohX=(cohX/ncoh-e.x);cohZ=(cohZ/ncoh-e.z);} 
+      ax+=sepX*1.6+aliX*0.12*e.genes.social+cohX*0.08*e.genes.social; 
+      az+=sepZ*1.6+aliZ*0.12*e.genes.social+cohZ*0.08*e.genes.social;
+      const resR=map.resources[mapCoord(e.x+0.8,e.z).i],resL=map.resources[mapCoord(e.x-0.8,e.z).i];
+      const resU=map.resources[mapCoord(e.x,e.z+0.8).i],resD=map.resources[mapCoord(e.x,e.z-0.8).i];
+      const gx=resR-resL,gz=resU-resD;
+      const hR=heightRawAt(e.x+0.6,e.z)-heightRawAt(e.x-0.6,e.z), hU=heightRawAt(e.x,e.z+0.6)-heightRawAt(e.x,e.z-0.6);
+      switch(behavior){
+        case 'forage':{
+          if(e.genes.diet===0){
+            const need=Math.max(0,RES_LOW_THRESHOLD-localRes)/RES_LOW_THRESHOLD;
+            const gradCoef=RES_GRAD_BASE*(1+need*RES_GRAD_LOW_RES_BOOST);
+            ax+=gx*gradCoef; az+=gz*gradCoef;
+          }else{
+            ax+=chaseX*1.2; az+=chaseZ*1.2;
+          }
+          break;
+        }
+        case 'drink':
+          ax+=-hR*0.9*thirst; az+=-hU*0.9*thirst; break;
+        case 'mate':
+          ax+=cohX*0.5; az+=cohZ*0.5; break;
+        case 'escape':
+          ax+=fleeX*1.7; az+=fleeZ*1.7; break;
+        case 'rest':
+          break;
+        case 'explore':
+        default:
+          ax+=(rand()*2-1)*0.3; az+=(rand()*2-1)*0.3; break;
+      }
     const sl=slopeAt(e.x,e.z); const avoidSlope=Math.max(0,sl-(0.10+0.15*e.genes.climb)); const inWater=heightRawAt(e.x,e.z)<map.waterLevel; e.mode=inWater?'swim':'walk';
     const acc=0.6+e.genes.speed*0.9; e.vx+=ax*acc*dt; e.vz+=az*acc*dt;
     const damp=inWater?(1-0.45*dt):(1-0.65*dt); e.vx*=damp*(1-avoidSlope*0.6)*(1-(inWater?(1-e.genes.swim)*0.7:0)); e.vz*=damp*(1-avoidSlope*0.6)*(1-(inWater?(1-e.genes.swim)*0.7:0));
@@ -193,15 +263,17 @@ function snapshot(){
   const list=new Array(entities.length);
   for(let i=0;i<entities.length;i++){
     const e=entities[i];
-    list[i]={
-      id:e.id,x:e.x,y:e.y,z:e.z,yaw:e.yaw,mode:e.mode,vx:e.vx,vz:e.vz,
-      species:e.species,
-      energy:e.energy,maxEnergy:maxEnergy(e.genes.size),
-      genes:{
-        size:e.genes.size,speed:e.genes.speed,climb:e.genes.climb,swim:e.genes.swim,
-        thermo:e.genes.thermo,social:e.genes.social,diet:e.genes.diet
-      }
-    };
+      list[i]={
+        id:e.id,x:e.x,y:e.y,z:e.z,yaw:e.yaw,mode:e.mode,vx:e.vx,vz:e.vz,
+        behavior:e.behavior,
+        species:e.species,
+        energy:e.energy,maxEnergy:maxEnergy(e.genes.size),
+        genes:{
+          size:e.genes.size,speed:e.genes.speed,climb:e.genes.climb,swim:e.genes.swim,
+          thermo:e.genes.thermo,social:e.genes.social,diet:e.genes.diet,
+          behavior:e.genes.behavior
+        }
+      };
   }
   postMessage({type:'state',payload:{entities:list,world,devices}});
 }
