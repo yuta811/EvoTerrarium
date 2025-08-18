@@ -79,7 +79,7 @@
       let obj=this.objects.get(e.id);
       if(!obj){obj=this._create();this.objects.set(e.id,obj);this.group.add(obj.group);}
       seen.add(e.id);
-      const g=e.genes||{}; // trait mapping: size->scale, speed->legs, climb->leg thickness, swim->tail+fins, social->head
+      const g=e.genes||{}; // trait mapping: size->scale, speed->legs, climb->leg thickness, swim->tail+fins, perception->head
       const s=(0.35+(g.size||0)*0.9+(e.mode==='swim'?-0.1:0))*CREATURE_SCALE;
       const tiltX=(e.vz||0)*0.06,tiltZ=-(e.vx||0)*0.06;
       obj.group.position.set(e.x,e.y,e.z);
@@ -89,8 +89,8 @@
       const bodyLen=s*2.0;
       obj.body.scale.set(s*1.2,s*0.7,bodyLen);
 
-      // social -> head size
-      const headScale=s*(0.6+(g.social||0)*0.4);
+      // perception -> head size
+      const headScale=s*(0.6+(g.perception||0)*0.4);
       obj.head.position.set(0,0,bodyLen*0.5);
       obj.head.scale.set(headScale,headScale,headScale);
 
