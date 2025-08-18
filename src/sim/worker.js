@@ -175,7 +175,7 @@ function tick(dt){
     map.resources[i]=Math.min(max,cur+max*map.resRegen[i]*dt);
   }
   world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
-    for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.005*dt*(1+(e.genes.diet===1?0.4:0));const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
+    for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.01*dt;e.hydration=Math.max(0,e.hydration);const s=3.0+e.genes.social*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
     const maxE=maxEnergy(e.genes.size);
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
     const comfortCoef = 1 + (1 - comfort) * BASAL_COMFORT_FACTOR;
