@@ -127,7 +127,7 @@ function spawnEntity(id){
   speciesHues[sp]=rand();
   regSpecies(sp,0);
   const energy=maxEnergy(g.size)*0.6;
-  return {id,x,z,y:heightAtWorld(x,z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,age:0.0,hydration:1.0,cooldown:30+rand()*30,genes:g,species:sp,mode:'walk',behavior:'explore',biomeExp:new Uint8Array(5),searchDir:null,searchTimer:0};
+  return {id,x,z,y:heightAtWorld(x,z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,age:0.0,hydration:1.0,cooldown:30+rand()*30,genes:g,species:sp,mode:'walk',behavior:'explore',biomeExp:new Uint8Array(5),searchDir:null,driftAngle:rand()*Math.PI*2};
 }
 function reproduce(p){
   const cg=newGenes(p.genes);
@@ -140,7 +140,7 @@ function reproduce(p){
     regSpecies(sp,p.species);
   }
   const energy=maxEnergy(cg.size)*0.6;
-    entities.push({id:nextId++,x:p.x+(rand()*2-1)*0.5,z:p.z+(rand()*2-1)*0.5,y:heightAtWorld(p.x,p.z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,hydration:0.8,age:0.0,cooldown:30+rand()*30,genes:cg,species:sp,mode:'walk',behavior:'explore',biomeExp:new Uint8Array(5),searchDir:null,searchTimer:0});
+    entities.push({id:nextId++,x:p.x+(rand()*2-1)*0.5,z:p.z+(rand()*2-1)*0.5,y:heightAtWorld(p.x,p.z)+0.35*CREATURE_SCALE,vx:0,vz:0,yaw:0,energy,hydration:0.8,age:0.0,cooldown:30+rand()*30,genes:cg,species:sp,mode:'walk',behavior:'explore',biomeExp:new Uint8Array(5),searchDir:null,driftAngle:rand()*Math.PI*2});
 }
 // env
 function comfortTempBase(z){return (Math.sin(z*0.07)*0.5+0.5);} function comfortTempWithDevices(x,z){let t=comfortTempBase(z);for(const d of devices){if(d.type!=='heater')continue;const dx=d.x-x,dz=d.z-z;const r2=dx*dx+dz*dz;const fall=Math.exp(-r2/(d.radius*d.radius));t=clamp01(t+d.power*0.25*fall);}return t;}
@@ -233,15 +233,10 @@ function tick(dt){
       }
       e.behavior=behavior;
       if (behavior === 'explore') {
-        e.searchTimer -= dt;
-        if (!e.searchDir || e.searchTimer <= 0) {
-          const ang = rand() * Math.PI * 2;
-          e.searchDir = {x: Math.cos(ang), z: Math.sin(ang)};
-          e.searchTimer = 4 + rand() * 4;
-        }
+        e.driftAngle += (rand()*2-1) * e.genes.drift;
+        e.searchDir = {x: Math.cos(e.driftAngle), z: Math.sin(e.driftAngle)};
       } else {
         e.searchDir = null;
-        e.searchTimer = 0;
       }
       let sepX=0,sepZ=0,aliX=0,aliZ=0,cohX=0,cohZ=0,nali=0,ncoh=0;
       for(const o of ar){
