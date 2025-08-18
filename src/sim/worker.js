@@ -294,7 +294,7 @@ function tick(dt){
     const gY=heightAtWorld(e.x,e.z); e.y=gY+(inWater?(map.waterLevel*VERT-gY):0)+(inWater?0.15:0.35)*CREATURE_SCALE; if(avoidSlope>0.6){e.vx-=Math.sign(e.vx)*0.02; e.vz-=Math.sign(e.vz)*0.02;}
     const biome=b; const biomeMul=(biome===2?0.6:(biome===3?1.3:(biome===4?0.7:1.0)));
       let intake=(e.genes.diet===0)?(0.7*plantRichnessAt(e.x,e.z)*biomeMul):0;
-      const moveCost=(0.002+0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0));
+      const moveCost=(0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0));
       const basal=(0.0008+0.0006*e.genes.size)*comfortCoef;
       if(e.genes.diet===0){
         const {i}=mapCoord(e.x,e.z);
