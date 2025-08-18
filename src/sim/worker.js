@@ -200,7 +200,6 @@ function tick(dt){
         if(v>th && v>maxDes){maxDes=v;behavior=k;}
       }
       e.behavior=behavior;
-      let ax=0,az=0;
       let sepX=0,sepZ=0,aliX=0,aliZ=0,cohX=0,cohZ=0,nali=0,ncoh=0;
       for(const o of ar){
         if(o===e)continue;
@@ -209,36 +208,42 @@ function tick(dt){
         if(o.genes.diet===e.genes.diet){aliX+=o.vx;aliZ+=o.vz;nali++;cohX+=o.x;cohZ+=o.z;ncoh++;}
       }
       if(nali>0){aliX/=nali;aliZ/=nali;}
-      if(ncoh>0){cohX=(cohX/ncoh-e.x);cohZ=(cohZ/ncoh-e.z);} 
-      ax+=sepX*1.6+aliX*0.12*e.genes.social+cohX*0.08*e.genes.social; 
-      az+=sepZ*1.6+aliZ*0.12*e.genes.social+cohZ*0.08*e.genes.social;
+      if(ncoh>0){cohX=(cohX/ncoh-e.x);cohZ=(cohZ/ncoh-e.z);}
+      const baseX=sepX*1.6+aliX*0.12*e.genes.social+cohX*0.08*e.genes.social;
+      const baseZ=sepZ*1.6+aliZ*0.12*e.genes.social+cohZ*0.08*e.genes.social;
       const resR=map.resources[mapCoord(e.x+0.8,e.z).i],resL=map.resources[mapCoord(e.x-0.8,e.z).i];
       const resU=map.resources[mapCoord(e.x,e.z+0.8).i],resD=map.resources[mapCoord(e.x,e.z-0.8).i];
       const gx=resR-resL,gz=resU-resD;
       const hR=heightRawAt(e.x+0.6,e.z)-heightRawAt(e.x-0.6,e.z), hU=heightRawAt(e.x,e.z+0.6)-heightRawAt(e.x,e.z-0.6);
-      switch(behavior){
-        case 'forage':{
-          if(e.genes.diet===0){
-            const need=Math.max(0,RES_LOW_THRESHOLD-localRes)/RES_LOW_THRESHOLD;
-            const gradCoef=RES_GRAD_BASE*(1+need*RES_GRAD_LOW_RES_BOOST);
-            ax+=gx*gradCoef; az+=gz*gradCoef;
-          }else{
-            ax+=chaseX*1.2; az+=chaseZ*1.2;
-          }
-          break;
-        }
-        case 'drink':
-          ax+=-hR*0.9*thirst; az+=-hU*0.9*thirst; break;
-        case 'mate':
-          ax+=cohX*0.5; az+=cohZ*0.5; break;
-        case 'escape':
-          ax+=fleeX*1.7; az+=fleeZ*1.7; break;
-        case 'rest':
-          break;
-        case 'explore':
-        default:
-          ax+=(rand()*2-1)*0.3; az+=(rand()*2-1)*0.3; break;
+      let forageX=0,forageZ=0;
+      if(e.genes.diet===0){
+        const need=Math.max(0,RES_LOW_THRESHOLD-localRes)/RES_LOW_THRESHOLD;
+        const gradCoef=RES_GRAD_BASE*(1+need*RES_GRAD_LOW_RES_BOOST);
+        forageX=gx*gradCoef; forageZ=gz*gradCoef;
+      }else{
+        forageX=chaseX*1.2; forageZ=chaseZ*1.2;
       }
+      const drinkX=-hR*0.9*thirst, drinkZ=-hU*0.9*thirst;
+      const mateX=cohX*0.5, mateZ=cohZ*0.5;
+      const escapeX=fleeX*1.7, escapeZ=fleeZ*1.7;
+      const restX=0, restZ=0;
+      const exploreX=(rand()*2-1)*0.3, exploreZ=(rand()*2-1)*0.3;
+      const vecs={
+        forage:{x:forageX,z:forageZ},
+        drink:{x:drinkX,z:drinkZ},
+        mate:{x:mateX,z:mateZ},
+        escape:{x:escapeX,z:escapeZ},
+        rest:{x:restX,z:restZ},
+        explore:{x:exploreX,z:exploreZ}
+      };
+      let desireX=0,desireZ=0;
+      for(const k in vecs){
+        const w=(k===behavior)?1.0:0.3;
+        desireX+=vecs[k].x*w;
+        desireZ+=vecs[k].z*w;
+      }
+      const ax=baseX+desireX;
+      const az=baseZ+desireZ;
     const sl=slopeAt(e.x,e.z); const avoidSlope=Math.max(0,sl-(0.10+0.15*e.genes.climb)); const inWater=heightRawAt(e.x,e.z)<map.waterLevel; e.mode=inWater?'swim':'walk';
     const acc=0.6+e.genes.speed*0.9; e.vx+=ax*acc*dt; e.vz+=az*acc*dt;
     const damp=inWater?(1-0.45*dt):(1-0.65*dt); e.vx*=damp*(1-avoidSlope*0.6)*(1-(inWater?(1-e.genes.swim)*0.7:0)); e.vz*=damp*(1-avoidSlope*0.6)*(1-(inWater?(1-e.genes.swim)*0.7:0));
