@@ -269,8 +269,9 @@ function tick(dt){
       const restX=0, restZ=0;
       let exploreX, exploreZ;
       if (e.searchDir) {
-        exploreX=0.3*e.searchDir.x+0.2*groupDir.x*e.genes.social;
-        exploreZ=0.3*e.searchDir.z+0.2*groupDir.z*e.genes.social;
+        const urge = 0.3 + deficit * 0.4;
+        exploreX = urge * e.searchDir.x + 0.2 * groupDir.x * e.genes.social;
+        exploreZ = urge * e.searchDir.z + 0.2 * groupDir.z * e.genes.social;
       } else {
         const ang=rand()*Math.PI*2;
         exploreX=Math.cos(ang)*0.3+0.2*groupDir.x*e.genes.social;
