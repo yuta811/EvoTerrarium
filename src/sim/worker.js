@@ -22,6 +22,8 @@ let randState=123456789; function rand(){randState^=randState<<13;randState^=ran
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 function maxEnergy(size){ return 1.0 + size * 2.0; }
 function norm(v,max){return clamp01(v/(max||1));}
+// Maximum speed based on genes.speed (baseline 3.0 at speed 0.5)
+function maxSpeedFor(e){ return 2.0 + e.genes.speed * 2.0; }
 // Map
 const VERT=8.0; let map={size:96,heights:new Float32Array(96*96),biomes:new Uint8Array(96*96),resources:new Float32Array(96*96),resMax:new Float32Array(96*96),resRegen:new Float32Array(96*96),smooth:0.3,waterLevel:-0.18};
 function noise2d(x,y,seed){function h(n){const s=Math.sin(n*0.0007+seed*1e-6)*43758.5453;return s-Math.floor(s);}const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;function f(t){return t*t*(3-2*t);}const tl=h(xi*157+yi*311),tr=h((xi+1)*157+yi*311),bl=h(xi*157+(yi+1)*311),br=h((xi+1)*157+(yi+1)*311);const u=f(xf),v=f(yf);return lerp(lerp(tl,tr,u),lerp(bl,br,u),v);} function ridged(x,y,seed){const n=noise2d(x,y,seed);return 1-Math.abs(n*2-1);} function fbm2d(x,y,seed){let sum=0,amp=1,freq=1,total=0;for(let o=0;o<4;o++){sum+=amp*(noise2d(x*freq,y*freq,seed+o*1013)-0.5)*2;total+=amp;amp*=0.5;freq*=2;}return sum/total;}
@@ -182,7 +184,7 @@ function tick(dt){
     const cur=map.resources[i],max=map.resMax[i];
     map.resources[i]=Math.min(max,cur+max*map.resRegen[i]*dt);
   }
-  world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();const maxS=3.0;
+  world.t+=dt;world.season=(Math.sin(world.t*0.05*world.seasonSpeed)*0.5+0.5);rebuild();
     for(let i=entities.length-1;i>=0;i--){const e=entities[i];e.age+=dt;e.cooldown-=dt;e.hydration-=0.01*dt;e.hydration=Math.max(0,e.hydration);const s=5.0+e.genes.perception*4.0;const ar=near(e.x,e.z,s);const b=biomeAt(e.x,e.z);e.biomeExp[b]=Math.min(255,e.biomeExp[b]+1);
     const maxE=maxEnergy(e.genes.size);
     const targetT=e.genes.thermo,hereT=comfortTempWithDevices(e.x,e.z),comfort=1-Math.abs(hereT-targetT),food=plantRichnessAt(e.x,e.z),atWater=waterNear(e.x,e.z);
@@ -289,12 +291,13 @@ function tick(dt){
     const sl=slopeAt(e.x,e.z); const avoidSlope=Math.max(0,sl-(0.10+0.15*e.genes.climb)); const inWater=heightRawAt(e.x,e.z)<map.waterLevel; e.mode=inWater?'swim':'walk';
     const acc=0.6+e.genes.speed*0.9; e.vx+=ax*acc*dt; e.vz+=az*acc*dt;
     const damp=inWater?(1-0.45*dt):(1-0.65*dt); e.vx*=damp*(1-avoidSlope*0.6)*(1-(inWater?(1-e.genes.swim)*0.7:0)); e.vz*=damp*(1-avoidSlope*0.6)*(1-(inWater?(1-e.genes.swim)*0.7:0));
-    const sp2=e.vx*e.vx+e.vz*e.vz, sp=Math.sqrt(sp2),limit=inWater?2.0:maxS; if(sp>limit){const s=limit/sp;e.vx*=s;e.vz*=s;}
+    const maxS=maxSpeedFor(e);
+    const sp2=e.vx*e.vx+e.vz*e.vz, sp=Math.sqrt(sp2),limit=inWater?1.5+e.genes.speed*1.5:maxS; if(sp>limit){const s=limit/sp;e.vx*=s;e.vz*=s;}
     e.x+=e.vx*dt; e.z+=e.vz*dt; const B=world.bounds-1.0; if(e.x<-B){e.x=-B;e.vx*=-0.8;} if(e.x>B){e.x=B;e.vx*=-0.8;} if(e.z<-B){e.z=-B;e.vz*=-0.8;} if(e.z>B){e.z=B;e.vz*=-0.8;}
     const gY=heightAtWorld(e.x,e.z); e.y=gY+(inWater?(map.waterLevel*VERT-gY):0)+(inWater?0.15:0.35)*CREATURE_SCALE; if(avoidSlope>0.6){e.vx-=Math.sign(e.vx)*0.02; e.vz-=Math.sign(e.vz)*0.02;}
     const biome=b; const biomeMul=(biome===2?0.6:(biome===3?1.3:(biome===4?0.7:1.0)));
       let intake=(e.genes.diet===0)?(0.7*plantRichnessAt(e.x,e.z)*biomeMul):0;
-      const moveCost=(0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0));
+      const moveCost=(0.0006*sp2)*(0.8+e.genes.size*0.6)*(1+avoidSlope*0.8+(inWater?(1-e.genes.swim)*0.9:0))*(1+e.genes.speed*0.5);
       const basal=(0.0008+0.0006*e.genes.size)*comfortCoef;
       if(e.genes.diet===0){
         const {i}=mapCoord(e.x,e.z);
@@ -306,7 +309,15 @@ function tick(dt){
       }else{
         e.energy-=(moveCost+basal);
       }
-      if(inWater)e.hydration=clamp01(e.hydration+0.5*dt); if(e.genes.diet===1){for(const o of ar){if(o===e||o.genes.diet!==0)continue;const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;if(d2<0.5*0.5){e.energy+=1.5;o.energy-=1.5;}}}
+      if(inWater)e.hydration=clamp01(e.hydration+0.5*dt);
+      if(e.genes.diet===1){
+        for(const o of ar){
+          if(o===e||o.genes.diet!==0)continue;
+          const dx=o.x-e.x,dz=o.z-e.z,d2=dx*dx+dz*dz;
+          const catchDist=Math.max(0.3,0.5+(e.genes.speed-o.genes.speed)*0.25);
+          if(d2<catchDist*catchDist){e.energy+=1.5;o.energy-=1.5;}
+        }
+      }
       e.hydration=clamp01(e.hydration);
       if (e.hydration <= 0) e.energy -= DEHYDRATION_PENALTY * dt;
       e.energy=maxE*norm(e.energy,maxE);
