@@ -12,6 +12,11 @@ const RES_GRAD_LOW_RES_BOOST = 1.5;     // extra boost when resources are scarce
 const RES_LOW_THRESHOLD = 0.3;          // threshold for low resource level
 const BASAL_COMFORT_FACTOR = 0.5;
 const DEHYDRATION_PENALTY = 0.02;
+
+let simSpeed = 1;
+let running = true;
+let accumulator = 0;
+let lastTime = performance.now();
 let randState=123456789; function rand(){randState^=randState<<13;randState^=randState>>>17;randState^=randState<<5;return (randState>>>0)/4294967296;}
 function clamp01(v){return Math.max(0,Math.min(1,v));} function lerp(a,b,t){return a+(b-a)*t;}
 function maxEnergy(size){ return 1.0 + size * 2.0; }
@@ -311,8 +316,25 @@ function snapshot(){
   }
   postMessage({type:'state',payload:{entities:list,world,devices}});
 }
-let timer=null; onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload;
-  if(t==='init'){init((p&&p.seed)||1,(p&&p.entityCount)||200,p&&p.simCap||4000); if(timer)clearInterval(timer); const dt=0.1; timer=setInterval(()=>{tick(dt);snapshot();},100);}
+
+const dt = 0.1;
+function loop(){
+  if(!running) return;
+  const now = performance.now();
+  accumulator += (now - lastTime) / 1000 * simSpeed;
+  lastTime = now;
+  let ticked = false;
+  while(accumulator >= dt){
+    tick(dt);
+    accumulator -= dt;
+    ticked = true;
+  }
+  if(ticked) snapshot();
+  setTimeout(loop,16);
+}
+
+onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload;
+  if(t==='init'){init((p&&p.seed)||1,(p&&p.entityCount)||200,p&&p.simCap||4000);running=true;accumulator=0;lastTime=performance.now();loop();}
   else if(t==='seasonSpeed'){world.seasonSpeed=p||1.0;}
   else if(t==='placeDevice'){devices.push({type:p.type,x:p.x,z:p.z,power:1.0,radius:5.0});}
   else if(t==='pickSelect'){let best=null,bd2=1e9;for(const ent of entities){const dx=ent.x-p.x,dz=ent.z-p.z,d2=dx*dx+dz*dz;if(d2<bd2){bd2=d2;best=ent;}} if(best)postMessage({type:'selected',payload:{x:best.x,z:best.z}});}
@@ -321,4 +343,7 @@ let timer=null; onmessage=(e)=>{try{const t=e.data.type,p=e.data.payload;
   else if(t==='selectSpecies'){postMessage({type:'rpgReady',payload:{species:p.species}});}
   else if(t==='resourceScale'){const newValue = (p !== undefined) ? p : 1.0;const factor=newValue/resourceScale;for(let i=0;i<map.resources.length;i++){map.resources[i]*=factor;map.resMax[i]*=factor;map.resRegen[i]*=factor;}resourceScale=newValue;world.resourceScale=newValue;snapshot();}
   else if(t==='simCap'){world.simCap=p||world.simCap;}
+  else if(t==='simSpeed'){simSpeed=p;}
+  else if(t==='pause'){running=false;}
+  else if(t==='resume'){running=true;lastTime=performance.now();loop();}
  }catch(err){postMessage({type:'error',payload:''+err});}};
