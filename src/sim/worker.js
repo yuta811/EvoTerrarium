@@ -72,6 +72,9 @@ function biomeAt(x,z){const c=mapCoord(x,z);return map.biomes[c.i]||0;}
 // Genes/species
 let nextId=1,nextSpeciesId=1;const speciesHues={};let treeNodes=[];
 function regSpecies(id,parent){const hue=(speciesHues[id]!==undefined?speciesHues[id]:rand());treeNodes.push({id,parent:parent||0,birth:world.t,hue});}
+const MUTATION_WIDTH=0.05;
+const DRIFT_STEP=0.01;
+
 function gdist(a,b){
   let d = Math.abs(a.size-b.size)*0.8+Math.abs(a.speed-b.speed)*0.6+
           Math.abs(a.thermo-b.thermo)*0.8+Math.abs(a.climb-b.climb)*0.6+
@@ -83,24 +86,27 @@ function gdist(a,b){
     d+=Math.abs((ba['w_'+k]??0.5)-(bb['w_'+k]??0.5))*0.2;
     d+=Math.abs((ba['th_'+k]??0.5)-(bb['th_'+k]??0.5))*0.2;
   }
+  d+=Math.abs((a.drift||0)-(b.drift||0))*0.5;
   return d;
 }
+
 function newGenes(base){
   const b=base&&base.behavior;
   const behavior={};
   const keys=['forage','drink','mate','rest','escape','explore'];
   for(const k of keys){
-    behavior['w_'+k]=clamp01(((b&&b['w_'+k])??rand())+(rand()*2-1)*0.05);
-    behavior['th_'+k]=clamp01(((b&&b['th_'+k])??rand())+(rand()*2-1)*0.05);
+    behavior['w_'+k]=clamp01(((b&&b['w_'+k])??rand())+(rand()*2-1)*MUTATION_WIDTH);
+    behavior['th_'+k]=clamp01(((b&&b['th_'+k])??rand())+(rand()*2-1)*MUTATION_WIDTH);
   }
   return {
-    size:clamp01((base&&base.size||0.5)+(rand()*2-1)*0.05),
-    speed:clamp01((base&&base.speed||0.5)+(rand()*2-1)*0.05),
-    thermo:clamp01((base&&base.thermo||rand())+(rand()*2-1)*0.03),
-    climb:clamp01((base&&base.climb||rand())+(rand()*2-1)*0.03),
-    swim:clamp01((base&&base.swim||rand())+(rand()*2-1)*0.03),
-    social:clamp01((base&&base.social||rand())+(rand()*2-1)*0.03),
+    size:clamp01((base&&base.size||0.5)+(rand()*2-1)*MUTATION_WIDTH),
+    speed:clamp01((base&&base.speed||0.5)+(rand()*2-1)*MUTATION_WIDTH),
+    thermo:clamp01((base&&base.thermo||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
+    climb:clamp01((base&&base.climb||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
+    swim:clamp01((base&&base.swim||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
+    social:clamp01((base&&base.social||rand())+(rand()*2-1)*(MUTATION_WIDTH*0.6)),
     diet:(base&&base.diet!==undefined)?base.diet:(rand()<0.15?1:0),
+    drift:(base&&base.drift||0)+rand()*DRIFT_STEP,
     behavior
   };
 }
@@ -116,9 +122,9 @@ function spawnEntity(id){
 function reproduce(p){
   const cg=newGenes(p.genes);
   const fav=p.biomeExp?p.biomeExp.indexOf(Math.max(...p.biomeExp)):0;
-  const drift=gdist(cg,p.genes)+((fav===2||fav===3)?0.05:0);
+  const dist=gdist(cg,p.genes)+((fav===2||fav===3)?0.05:0);
   let sp=p.species;
-  if(drift>0.22){
+  if(dist>0.22){
     sp=++nextSpeciesId;
     speciesHues[sp]=rand();
     regSpecies(sp,p.species);
