@@ -71,17 +71,27 @@ function biomeAt(x,z){const c=mapCoord(x,z);return map.biomes[c.i]||0;}
 // Genes/species
 let nextId=1,nextSpeciesId=1;const speciesHues={};let treeNodes=[];
 function regSpecies(id,parent){const hue=(speciesHues[id]!==undefined?speciesHues[id]:rand());treeNodes.push({id,parent:parent||0,birth:world.t,hue});}
-function gdist(a,b){return Math.abs(a.size-b.size)*0.8+Math.abs(a.speed-b.speed)*0.6+Math.abs(a.thermo-b.thermo)*0.8+Math.abs(a.climb-b.climb)*0.6+Math.abs(a.swim-b.swim)*0.6+Math.abs(a.social-b.social)*0.4+(a.diet!==b.diet?0.4:0);}
+function gdist(a,b){
+  let d = Math.abs(a.size-b.size)*0.8+Math.abs(a.speed-b.speed)*0.6+
+          Math.abs(a.thermo-b.thermo)*0.8+Math.abs(a.climb-b.climb)*0.6+
+          Math.abs(a.swim-b.swim)*0.6+Math.abs(a.social-b.social)*0.4+
+          (a.diet!==b.diet?0.4:0);
+  const ba=a.behavior||{}, bb=b.behavior||{};
+  const keys=['forage','drink','mate','rest','escape','explore'];
+  for(const k of keys){
+    d+=Math.abs((ba['w_'+k]??0.5)-(bb['w_'+k]??0.5))*0.2;
+    d+=Math.abs((ba['th_'+k]??0.5)-(bb['th_'+k]??0.5))*0.2;
+  }
+  return d;
+}
 function newGenes(base){
   const b=base&&base.behavior;
-  const behavior={
-    forage:clamp01((b&&b.forage||rand())+(rand()*2-1)*0.05),
-    drink:clamp01((b&&b.drink||rand())+(rand()*2-1)*0.05),
-    mate:clamp01((b&&b.mate||rand())+(rand()*2-1)*0.05),
-    rest:clamp01((b&&b.rest||rand())+(rand()*2-1)*0.05),
-    escape:clamp01((b&&b.escape||rand())+(rand()*2-1)*0.05),
-    explore:clamp01((b&&b.explore||rand())+(rand()*2-1)*0.05)
-  };
+  const behavior={};
+  const keys=['forage','drink','mate','rest','escape','explore'];
+  for(const k of keys){
+    behavior['w_'+k]=clamp01(((b&&b['w_'+k])??rand())+(rand()*2-1)*0.05);
+    behavior['th_'+k]=clamp01(((b&&b['th_'+k])??rand())+(rand()*2-1)*0.05);
+  }
   return {
     size:clamp01((base&&base.size||0.5)+(rand()*2-1)*0.05),
     speed:clamp01((base&&base.speed||0.5)+(rand()*2-1)*0.05),
@@ -181,16 +191,14 @@ function tick(dt){
       const U_escape=Math.sqrt(fleeX*fleeX+fleeZ*fleeZ);
       const U_explore=0.1;
       const bw=e.genes.behavior||{};
-      const desires={
-        forage:U_forage*(bw.forage??1),
-        drink:U_drink*(bw.drink??1),
-        mate:U_mate*(bw.mate??1),
-        rest:U_rest*(bw.rest??1),
-        escape:U_escape*(bw.escape??1),
-        explore:U_explore*(bw.explore??1)
-      };
+      const u={forage:U_forage,drink:U_drink,mate:U_mate,rest:U_rest,escape:U_escape,explore:U_explore};
       let behavior='explore',maxDes=-1;
-      for(const k in desires){const v=desires[k];if(v>maxDes){maxDes=v;behavior=k;}}
+      for(const k in u){
+        const w=bw['w_'+k]??1;
+        const th=bw['th_'+k]??0;
+        const v=u[k]*w;
+        if(v>th && v>maxDes){maxDes=v;behavior=k;}
+      }
       e.behavior=behavior;
       let ax=0,az=0;
       let sepX=0,sepZ=0,aliX=0,aliZ=0,cohX=0,cohZ=0,nali=0,ncoh=0;
@@ -271,7 +279,14 @@ function snapshot(){
         genes:{
           size:e.genes.size,speed:e.genes.speed,climb:e.genes.climb,swim:e.genes.swim,
           thermo:e.genes.thermo,social:e.genes.social,diet:e.genes.diet,
-          behavior:e.genes.behavior
+          behavior:{
+            w_forage:e.genes.behavior.w_forage,w_drink:e.genes.behavior.w_drink,
+            w_mate:e.genes.behavior.w_mate,w_rest:e.genes.behavior.w_rest,
+            w_escape:e.genes.behavior.w_escape,w_explore:e.genes.behavior.w_explore,
+            th_forage:e.genes.behavior.th_forage,th_drink:e.genes.behavior.th_drink,
+            th_mate:e.genes.behavior.th_mate,th_rest:e.genes.behavior.th_rest,
+            th_escape:e.genes.behavior.th_escape,th_explore:e.genes.behavior.th_explore
+          }
         }
       };
   }
