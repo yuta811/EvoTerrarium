@@ -195,7 +195,7 @@ function tick(dt){
       U_forage*=hunger;
       let U_drink=(atWater?0.5:0)+thirst*0.8;
       U_drink*=thirst;
-      let U_mate=(e.energy>1.2&&e.cooldown<=0)?(0.3+e.genes.social*0.4):0.0;
+      let U_mate=(e.energy>1.2&&e.cooldown<=0&&e.age>=60)?(0.3+e.genes.social*0.4):0.0;
       let U_rest=(energy01<0.3?0.6:0.1)*(1-comfort);
       let fleeX=0,fleeZ=0,chaseX=0,chaseZ=0,prey=0;
       for(const o of ar){
@@ -285,7 +285,7 @@ function tick(dt){
       e.hydration=clamp01(e.hydration);
       if (e.hydration <= 0) e.energy -= DEHYDRATION_PENALTY * dt;
       e.energy=maxE*norm(e.energy,maxE);
-      if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxE*0.75&&e.hydration>0.3){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<=0||e.age>300){entities.splice(i,1);continue;}
+      if(entities.length<world.simCap&&e.cooldown<=0&&e.energy>maxE*0.75&&e.hydration>0.3&&e.age>=60){e.cooldown=6+rand()*6;e.energy-=0.6;reproduce(e);} if(e.energy<=0||e.age>300){entities.splice(i,1);continue;}
     e.yaw=Math.atan2(e.vx,e.vz);
   }
 }
