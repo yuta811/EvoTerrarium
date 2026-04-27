@@ -143,13 +143,17 @@
     }
     this.objects.clear();
   };
-  const d=(m)=>{const el=document.getElementById('diag');if(el)el.textContent='diag: '+m;console.log('[diag]',m);};
-  const container=document.getElementById('app');d('engine constructing');const engine=new Engine3D(container);engine.onResize();
+  const DEBUG=new URLSearchParams(location.search).get('debug')==='1';
+  const d=(m)=>{if(m==='state ok'&&!DEBUG)return;const el=document.getElementById('diag');if(el)el.textContent='diag: '+m;console.log('[diag]',m);};
+  const showBootError=(msg)=>{const ov=document.getElementById('bootError');const m=document.getElementById('bootErrorMsg');if(m)m.textContent=msg||'起動に失敗しました';if(ov)ov.style.display='flex';};
+  const container=document.getElementById('app');d('engine constructing');let engine=null;try{engine=new Engine3D(container);engine.onResize();}catch(err){d('engine failed: '+err.message);showBootError('3Dエンジンの初期化に失敗しました: '+err.message);const rb=document.getElementById('reloadBtn');rb&&rb.addEventListener('click',()=>location.reload());return;}
   let cap=parseInt(document.getElementById('cap').value,10);let creatures=new CMesh(cap);engine.scene.add(creatures.mesh);let sim=null;try{sim=new Worker('./src/sim/worker.js');d('worker started');}catch(e){d('worker failed: '+e);}
-  const statsEl=document.getElementById('stats');const seasonSpeed=document.getElementById('seasonSpeed');
+  const statsEl=document.getElementById('stats');const inspectEl=document.getElementById('inspect');const seasonSpeed=document.getElementById('seasonSpeed');
   const resScale=document.getElementById('resScale');const resScaleReset=document.getElementById('resScaleReset');
   const timeScale=document.getElementById('timeScale');const pauseBtn=document.getElementById('pauseBtn');
-  const treeCanvas=document.getElementById('tree');const tctx=treeCanvas.getContext('2d');let treeData={nodes:[]};
+  const treeCanvas=document.getElementById('tree');const tctx=treeCanvas.getContext('2d');let treeData={nodes:[]};let selectedId=null;let selectedSnapshot=null;
+  function updateInspectPanel(entity){if(!inspectEl)return;if(!entity&&!selectedSnapshot){inspectEl.textContent='選択中: なし';return;}const src=entity||selectedSnapshot;const diet=src.genes?(src.genes.diet===1?'肉食':'草食'):(src.diet===1?'肉食':'草食');const energy=src.energy||0;const maxE=src.maxEnergy||1;const hydration=src.hydration!==undefined?src.hydration:(src.hydration01!==undefined?src.hydration01:0);const age=src.age||0;const behavior=src.behavior||'unknown';inspectEl.textContent=`#${src.id||'?'} 種:${src.species||'?'} ${diet} 行動:${behavior} | Energy:${energy.toFixed(2)}/${maxE.toFixed(2)} Hydration:${hydration.toFixed(2)} Age:${age.toFixed(1)}`;}
+  function renderSpeciesBar(list){const bar=document.getElementById('speciesBar');if(!bar)return;bar.innerHTML='';const total=list.reduce((a,b)=>a+b.count,0)||1;const TOP=24;const sorted=[...list].sort((a,b)=>b.count-a.count);const top=sorted.slice(0,TOP);const other=sorted.slice(TOP).reduce((a,b)=>a+b.count,0);const frag=document.createDocumentFragment();for(const sp of top){const seg=document.createElement('div');seg.className='speciesSeg';seg.style.width=(sp.count/total*100)+'%';seg.style.background=sp.color;seg.title=`species ${sp.species}: ${sp.count}`;frag.appendChild(seg);}if(other>0){const seg=document.createElement('div');seg.className='speciesSeg';seg.style.width=(other/total*100)+'%';seg.style.background='rgba(200,200,200,0.35)';seg.title=`others: ${other}`;frag.appendChild(seg);}bar.appendChild(frag);}
   function drawTree(){const s=(window.devicePixelRatio||1);treeCanvas.width=window.innerWidth*s;treeCanvas.height=window.innerHeight*s;tctx.setTransform(1,0,0,1,0,0);tctx.clearRect(0,0,treeCanvas.width,treeCanvas.height);tctx.lineWidth=2*s;if(!treeData.nodes.length)return;const maxT=Math.max(...treeData.nodes.map(n=>n.birth));const minT=Math.min(...treeData.nodes.map(n=>n.birth));const G={};treeData.nodes.forEach(n=>{(G[n.parent]||(G[n.parent]=[])).push(n);});function layout(pid,depth,y0){const arr=G[pid]||[];const gap=60*s;let y=y0;for(const n of arr){n._x=(depth+1)*120*s;n._y=y;layout(n.id,depth+1,y);y+=gap;}if(arr.length===0)y=y0+gap;return y;}const root={id:0};root._x=40*s;root._y=40*s;layout(0,0,80*s);tctx.font=`${12*s}px sans-serif`;for(const n of treeData.nodes){const hue=(n.hue||0.35);tctx.fillStyle=`hsl(${Math.floor((hue*360)%360)},70%,60%)`;tctx.beginPath();tctx.arc(n._x,n._y,8*s,0,Math.PI*2);tctx.fill();tctx.fillText(String(n.id),n._x+10*s,n._y-8*s);}for(const n of treeData.nodes){const arr=G[n.parent]||[];for(const ch of arr){tctx.strokeStyle='rgba(255,255,255,0.35)';tctx.beginPath();tctx.moveTo(n._x,n._y);tctx.lineTo(ch._x,ch._y);tctx.stroke();}}}
   function showTree(v){treeCanvas.style.display=v?'block':'none';if(v)drawTree();}
   treeCanvas.addEventListener('click',e=>{const s=(window.devicePixelRatio||1),r=treeCanvas.getBoundingClientRect();const x=(e.clientX-r.left)*s,y=(e.clientY-r.top)*s;for(const n of treeData.nodes){const dx=x-n._x,dy=y-n._y;if(dx*dx+dy*dy<14*14*s){sim&&sim.postMessage({type:'selectSpecies',payload:{species:n.id}});showTree(false);break;}}});
@@ -161,17 +165,22 @@
       engine.updateDevices(p.devices||[]);
       const speciesMap={};
       for(const e of p.entities){const s=e.species,d=e.genes&&e.genes.diet||0;const m=speciesMap[s]||(speciesMap[s]={count:0,diet:d});m.count++;}
-      const carnivores=[],herbivores=[];
-      for(const s in speciesMap){const info=speciesMap[s];const color=creatures._colorFrom({species:parseInt(s,10),genes:{diet:info.diet}}).getStyle();const obj={species:parseInt(s,10),count:info.count,color};(info.diet===1?carnivores:herbivores).push(obj);}
-      carnivores.sort((a,b)=>b.count-a.count);herbivores.sort((a,b)=>b.count-a.count);
-      const bar=document.getElementById('speciesBar');
-      if(bar){bar.innerHTML='';let acc=0,total=p.entities.length||1;for(const sp of carnivores){const seg=document.createElement('div');seg.className='speciesSeg';const pct=sp.count/total*100;seg.style.left=acc+'%';seg.style.width=pct+'%';seg.style.background=sp.color;bar.appendChild(seg);acc+=pct;}acc=0;for(const sp of herbivores){const seg=document.createElement('div');seg.className='speciesSeg';const pct=sp.count/total*100;seg.style.right=acc+'%';seg.style.width=pct+'%';seg.style.background=sp.color;bar.appendChild(seg);acc+=pct;}}
+      const speciesList=[];
+      for(const s in speciesMap){const info=speciesMap[s];const color=creatures._colorFrom({species:parseInt(s,10),genes:{diet:info.diet}}).getStyle();speciesList.push({species:parseInt(s,10),count:info.count,color,diet:info.diet});}
+      renderSpeciesBar(speciesList);
+      if(selectedId!==null){const ent=p.entities.find(e=>e.id===selectedId);if(ent)updateInspectPanel(ent);}
       const maxE=p.entities.reduce((m,e)=>Math.max(m,e.maxEnergy||0),0);
       statsEl.textContent=`entities: ${p.entities.length} • time: ${p.world.t.toFixed(1)}s • season:${p.world.season.toFixed(2)} • maxE:${maxE.toFixed(2)}`;
       d('state ok');
-    }else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){engine.highlightAt(p);}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}
+    }else if(t==='map'){applyMap(p);}else if(t==='tree'){treeData=p;showTree(true);}else if(t==='selected'){selectedId=p.id??null;selectedSnapshot=p;engine.highlightAt(p);updateInspectPanel();}else if(t==='rpgReady'){d('RPG species selected: '+p.species);}else if(t==='error'){statsEl.textContent='worker error: '+p;d('worker error: '+p);}
   };sim.postMessage({type:'init',payload:{seed:Date.now(),entityCount:400,simCap:parseInt(document.getElementById('simCap').value,10)}});}
   engine.start();
+  const onboarding=document.getElementById('onboarding');
+  const skipGuide=document.getElementById('skipGuide');
+  if(onboarding&&localStorage.getItem('evo_onboarded')!=='1'){onboarding.style.display='flex';}
+  skipGuide&&skipGuide.addEventListener('click',()=>{localStorage.setItem('evo_onboarded','1');if(onboarding)onboarding.style.display='none';});
+  const presets={lite:{cap:1200,simCap:2000,timeScale:1.0},balanced:{cap:2500,simCap:4000,timeScale:1.0},rich:{cap:4500,simCap:9000,timeScale:1.2}};
+  document.querySelectorAll('.preset').forEach(btn=>btn.addEventListener('click',()=>{const p=presets[btn.dataset.preset];if(!p)return;const capEl=document.getElementById('cap');const simCapEl=document.getElementById('simCap');const tEl=document.getElementById('timeScale');capEl.value=String(p.cap);capEl.dispatchEvent(new Event('input',{bubbles:true}));simCapEl.value=String(p.simCap);simCapEl.dispatchEvent(new Event('input',{bubbles:true}));tEl.value=String(p.timeScale);tEl.dispatchEvent(new Event('input',{bubbles:true}));d('preset: '+btn.dataset.preset);}));
   seasonSpeed.addEventListener('input',function(){sim&&sim.postMessage({type:'seasonSpeed',payload:parseFloat(this.value)})});
   resScale&&resScale.addEventListener('input',function(){const newScale=parseFloat(this.value);sim&&sim.postMessage({type:'resourceScale', payload:newScale});});
   resScaleReset&&resScaleReset.addEventListener('click',function(){if(resScale)resScale.value='1';sim&&sim.postMessage({type:'resourceScale', payload:1.0});});
@@ -182,6 +191,7 @@
   document.getElementById('regen').addEventListener('click',()=>{const smooth=parseFloat(document.getElementById('step').value),slope=parseFloat(document.getElementById('slope').value),mount=parseFloat(document.getElementById('mount').value),rivers=document.getElementById('rivers').checked,biomes=[...document.querySelectorAll('.biome:checked')].map(b=>b.value),seed=parseInt(document.getElementById('seed').value,10)||Date.now();sim&&sim.postMessage({type:'regenMap',payload:{seed,size:96,smooth,slope,mount,rivers,biomes}});});
   document.getElementById('treeBtn').addEventListener('click',()=>{sim&&sim.postMessage({type:'getTree'})});
   let mode='select';document.querySelectorAll('#modes button').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('#modes button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');mode=btn.dataset.mode;}));
+  window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();pauseBtn&&pauseBtn.click();}if(e.key==='r'||e.key==='R'){document.getElementById('regen').click();}if(e.key==='t'||e.key==='T'){document.getElementById('treeBtn').click();}});
   window.addEventListener('resize',()=>{engine.onResize();if(treeCanvas.style.display==='block')drawTree();});
   engine.onPick(function(pos){if(!sim)return;if(mode==='select')sim.postMessage({type:'pickSelect',payload:{x:pos.x,z:pos.z}});else if(mode==='sprinkler')sim.postMessage({type:'placeDevice',payload:{type:'sprinkler',x:pos.x,z:pos.z}});else if(mode==='heater')sim.postMessage({type:'placeDevice',payload:{type:'heater',x:pos.x,z:pos.z}});});
 })(window);
