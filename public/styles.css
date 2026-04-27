@@ -12,3 +12,13 @@ html,body{margin:0;padding:0;height:100%;width:100%;background:#0f151d;color:#e6
 #diag{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #speciesBar{position:fixed;top:8px;right:8px;width:240px;height:12px;pointer-events:none}
 .speciesSeg{position:absolute;top:0;bottom:0}
+.preset{background:rgba(60,90,120,.45)!important}
+.overlay{position:fixed;inset:0;background:rgba(5,10,18,.75);display:flex;align-items:center;justify-content:center;z-index:20}
+.overlay .card{max-width:560px;background:#101a25;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.overlay h2{margin:0 0 8px 0;font-size:22px}
+.overlay p,.overlay li{font-size:14px;line-height:1.5;color:#d8e5f0}
+.overlay ol{padding-left:20px}
+.overlay .actions{display:flex;justify-content:flex-end;margin-top:12px}
+.inspect{position:fixed;right:8px;bottom:44px;max-width:340px;white-space:normal;line-height:1.35;pointer-events:none}
+#speciesBar{display:flex;overflow:hidden;border-radius:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+.speciesSeg{position:relative}

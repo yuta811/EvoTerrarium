@@ -19,6 +19,10 @@
       <label>時間倍率</label><input id="timeScale" type="range" min="0" max="4" step="0.1" value="1">
       <button id="pauseBtn">一時停止</button>
       <button id="treeBtn">系統樹</button>
+      <span class="sep"></span>
+      <button class="preset" data-preset="lite">軽量</button>
+      <button class="preset" data-preset="balanced">標準</button>
+      <button class="preset" data-preset="rich">高密度</button>
     </div>
     <div class="row">
       <button id="regen">地形再生成</button>
@@ -52,6 +56,33 @@
   </div>
 
   <div id="speciesBar"></div>
+  <div id="inspect" class="pill inspect">選択中: なし</div>
+
+  
+
+  <div id="bootError" class="overlay" style="display:none;">
+    <div class="card">
+      <h2>起動エラー</h2>
+      <p id="bootErrorMsg">レンダラーの初期化に失敗しました。</p>
+      <p>ネットワーク環境を確認するか、ページを再読み込みしてください。</p>
+      <button id="reloadBtn">再読み込み</button>
+    </div>
+  </div>
+
+  <div id="onboarding" class="overlay" style="display:none;">
+    <div class="card">
+      <h2>EvoTerrariumへようこそ</h2>
+      <ol>
+        <li>ドラッグで視点回転、ホイール/ピンチでズーム。</li>
+        <li>「選択」モードで個体をタップして観察。</li>
+        <li>「スプリンクラー」「ヒーター」で環境介入。</li>
+        <li>「地形再生成」とプリセットで世界を作り直し。</li>
+      </ol>
+      <div class="actions">
+        <button id="skipGuide">閉じる</button>
+      </div>
+    </div>
+  </div>
 
   <script>
   (function(){
